@@ -15,6 +15,8 @@ mod engine;
 #[cfg(windows)]
 mod filters;
 #[cfg(windows)]
+pub mod net_events;
+#[cfg(windows)]
 mod provider;
 
 pub use error::{FirewallError, Result};
@@ -40,7 +42,22 @@ impl FirewallManager {
         #[cfg(windows)]
         {
             let engine = engine::EngineHandle::open()?;
-            Ok(Self { engine })
+            let manager = Self { engine };
+            net_events::start_monitoring(&manager.engine);
+            manager.seed_blocked_tracking();
+            Ok(manager)
+        }
+    }
+
+    /// Seeds the blocked-today tracker with executables that already have rules
+    /// so events for pre-existing blocks are still counted after a restart.
+    #[cfg(windows)]
+    fn seed_blocked_tracking(&self) {
+        if let Ok(rules) = self.list_rules() {
+            for rule in rules {
+                let key = crate::network::normalize_path_key(&rule.exe_path.to_string_lossy());
+                net_events::counters().set_tracked(key, true);
+            }
         }
     }
 
@@ -63,7 +80,9 @@ impl FirewallManager {
             provider::ensure_provider_and_sublayer(&self.engine)?;
             let app_id = app_id::AppIdBlob::from_executable_path(&exe_path)?;
             filters::add_block_filters(&self.engine, exe_str, &app_id)?;
-            tx.commit()
+            tx.commit()?;
+            net_events::counters().set_tracked(crate::network::normalize_path_key(exe_str), true);
+            Ok(())
         }
     }
 
@@ -84,7 +103,9 @@ impl FirewallManager {
 
             let tx = self.engine.transaction()?;
             filters::delete_block_filters(&self.engine, exe_str)?;
-            tx.commit()
+            tx.commit()?;
+            net_events::counters().set_tracked(crate::network::normalize_path_key(exe_str), false);
+            Ok(())
         }
     }
 
@@ -118,6 +139,17 @@ impl FirewallManager {
         {
             filters::list_provider_rules(&self.engine)
         }
+    }
+
+    /// Returns the count of connection attempts blocked by managed rules since midnight (UTC).
+    #[cfg(windows)]
+    pub fn blocked_today(&self) -> u32 {
+        net_events::counters().blocked_today()
+    }
+
+    #[cfg(not(windows))]
+    pub fn blocked_today(&self) -> u32 {
+        0
     }
 
     /// Removes all WFP filters owned by this application's provider.

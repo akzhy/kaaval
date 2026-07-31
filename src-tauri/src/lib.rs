@@ -1,5 +1,6 @@
 mod firewall;
 mod network;
+mod stats;
 
 use std::collections::HashSet;
 use std::sync::{Mutex, Once};
@@ -9,6 +10,7 @@ use tracing::{error, info, warn};
 
 use firewall::{FirewallManager, FirewallRuleDto};
 use network::NetworkRequestDto;
+use stats::DashboardStatsDto;
 
 #[derive(Default)]
 struct FirewallState {
@@ -123,6 +125,19 @@ fn list_network_requests(state: tauri::State<'_, Mutex<FirewallState>>) -> Resul
     Ok(network::to_dto_with_blocking(requests, &blocked_paths))
 }
 
+#[tauri::command]
+fn get_dashboard_stats(state: tauri::State<'_, Mutex<FirewallState>>) -> Result<DashboardStatsDto, String> {
+    let requests = network::list_network_requests()?;
+    let active_sessions = stats::active_sessions(&network::to_dto_with_blocking(requests, &Default::default()));
+    let blocked_today = with_manager(&state, |manager| Ok(manager.blocked_today())).unwrap_or(0);
+
+    Ok(DashboardStatsDto {
+        throughput_mbps: stats::throughput_mbps(),
+        active_sessions,
+        blocked_today,
+    })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     static TRACING_INIT: Once = Once::new();
@@ -142,7 +157,8 @@ pub fn run() {
             is_application_blocked,
             list_firewall_rules,
             remove_all_firewall_rules,
-            list_network_requests
+            list_network_requests,
+            get_dashboard_stats
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
