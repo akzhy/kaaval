@@ -10,8 +10,14 @@ function TopBar({ secure, throughputMbps }: TopBarProps) {
   return (
     <header className="topbar">
       <div className="status">
-        <span className={secure ? "status-dot status-dot-ok" : "status-dot status-dot-bad"} />
-        <span className="status-label">Global Status: {secure ? "Secure" : "Attention Needed"}</span>
+        <span
+          className={
+            secure ? "status-dot status-dot-ok" : "status-dot status-dot-bad"
+          }
+        />
+        <span className="status-label">
+          App Status: {secure ? "Running" : "Attention Needed"}
+        </span>
       </div>
       <div className="net">
         <span className="net-label">Net</span>

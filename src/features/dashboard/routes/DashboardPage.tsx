@@ -1,11 +1,10 @@
-import { css } from "@flairjs/client";
 import Card from "@/components/Card";
-import { useNetworkStore } from "@/store/networkStore";
-import { buildApplicationGroups } from "@/utils/groupRequests";
 import ModesPreview from "@/features/dashboard/components/ModesPreview";
 import RecentActivityTable from "@/features/dashboard/components/RecentActivityTable";
-import StatCard from "@/features/dashboard/components/StatCard";
 import ThroughputChart from "@/features/dashboard/components/ThroughputChart";
+import { useNetworkStore } from "@/store/networkStore";
+import { buildApplicationGroups } from "@/utils/groupRequests";
+import { css } from "@flairjs/client";
 
 function DashboardPage() {
   const requests = useNetworkStore((state) => state.requests);
@@ -25,22 +24,6 @@ function DashboardPage() {
           <ThroughputChart
             history={throughputHistory}
             current={dashboardStats.throughput_mbps}
-          />
-        </Card>
-        <Card>
-          <StatCard
-            label="Blocked Today"
-            value={dashboardStats.blocked_today.toLocaleString()}
-            hint="Intrusions prevented in last 24h"
-            tone="negative"
-          />
-        </Card>
-        <Card>
-          <StatCard
-            label="Active Sessions"
-            value={dashboardStats.active_sessions.toLocaleString()}
-            hint="Concurrent verified connections"
-            tone="positive"
           />
         </Card>
       </div>

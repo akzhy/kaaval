@@ -12,7 +12,7 @@ import type {
   NetworkRequest,
 } from "@/utils/types";
 
-const THROUGHPUT_HISTORY_LENGTH = 10;
+const THROUGHPUT_HISTORY_LENGTH = 100;
 
 type NetworkStore = {
   requests: NetworkRequest[];

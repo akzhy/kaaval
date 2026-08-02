@@ -1,4 +1,8 @@
-import { createRootRoute, createRoute, createRouter } from "@tanstack/react-router";
+import {
+  createRootRoute,
+  createRoute,
+  createRouter,
+} from "@tanstack/react-router";
 import RootLayout from "./root";
 import DashboardPage from "@/features/dashboard/routes/DashboardPage";
 import ActivityLogPage from "@/features/activity-log/routes/ActivityLogPage";
@@ -31,7 +35,12 @@ const settingsRoute = createRoute({
   component: SettingsPage,
 });
 
-const routeTree = rootRoute.addChildren([dashboardRoute, modesRoute, activityLogRoute, settingsRoute]);
+const routeTree = rootRoute.addChildren([
+  dashboardRoute,
+  modesRoute,
+  activityLogRoute,
+  settingsRoute,
+]);
 
 export const router = createRouter({ routeTree });
 

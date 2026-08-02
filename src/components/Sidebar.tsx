@@ -14,7 +14,6 @@ function Sidebar() {
     <aside className="sidebar">
       <div className="brand">
         <p className="brand-name">Kaaval</p>
-        <p className="brand-tag">Enterprise Firewall</p>
       </div>
 
       <nav className="nav">
@@ -52,12 +51,6 @@ Sidebar.flair = css`
     font-size: 1.3rem;
     font-weight: 700;
     color: $colors.primary;
-  }
-
-  .brand-tag {
-    margin: 2px 0 0;
-    font-size: 0.72rem;
-    color: $colors.text-muted;
   }
 
   .nav {

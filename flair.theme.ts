@@ -8,7 +8,7 @@ const theme = defineConfig({
       primary: "#0078d4",
       surface: "#131313",
       "surface-dim": "#131313",
-      "surface-bright": "#393939",
+      "surface-bright": "#1a1a1a",
       positive: "#79dd68",
       negative: "#d93a3d",
       border: "#2f2f2f",
