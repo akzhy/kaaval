@@ -57,19 +57,12 @@ DashboardPage.flair = css`
 
   .dashboard-grid {
     display: grid;
-    grid-template-columns: 2fr 1fr 1fr;
-    gap: 16px;
   }
 
   .dashboard-throughput {
     min-height: 180px;
   }
 
-  @media (max-width: 900px) {
-    .dashboard-grid {
-      grid-template-columns: 1fr;
-    }
-  }
 `;
 
 export default DashboardPage;

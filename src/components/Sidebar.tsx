@@ -1,19 +1,40 @@
 import { Link } from "@tanstack/react-router";
-import { c, css } from "@flairjs/client";
-import { ActivityLogIcon, DashboardIcon, ModesIcon, SettingsIcon } from "./icons";
+import { css } from "@flairjs/client";
+import { useState } from "react";
+import clsx from "clsx";
+import {
+  ChartNoAxesCombined,
+  ChevronLeft,
+  ChevronRight,
+  Logs,
+  Settings,
+  SlidersHorizontal,
+} from "lucide-react";
 
 const NAV_ITEMS = [
-  { to: "/", label: "Dashboard", Icon: DashboardIcon },
-  { to: "/modes", label: "Modes", Icon: ModesIcon },
-  { to: "/activity-log", label: "Activity Log", Icon: ActivityLogIcon },
-  { to: "/settings", label: "Settings", Icon: SettingsIcon },
+  { to: "/", label: "Dashboard", Icon: ChartNoAxesCombined },
+  { to: "/modes", label: "Modes", Icon: SlidersHorizontal },
+  { to: "/activity-log", label: "Activity Log", Icon: Logs },
+  { to: "/settings", label: "Settings", Icon: Settings },
 ] as const;
 
 function Sidebar() {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
   return (
-    <aside className="sidebar">
+    <aside className={clsx("sidebar", { "sidebar-collapsed": isCollapsed })}>
       <div className="brand">
-        <p className="brand-name">Kaaval</p>
+        <p className="brand-name">{isCollapsed ? "K" : "Kaaval"}</p>
+        <button
+          type="button"
+          className={clsx("collapse-btn", {
+            "collapse-btn-collapsed": isCollapsed,
+          })}
+          onClick={() => setIsCollapsed((prev) => !prev)}
+          aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+        </button>
       </div>
 
       <nav className="nav">
@@ -21,12 +42,17 @@ function Sidebar() {
           <Link
             key={to}
             to={to}
-            className="nav-link"
+            className={clsx("nav-link", { "nav-link-collapsed": isCollapsed })}
             activeOptions={{ exact: to === "/" }}
-            activeProps={{ className: c("nav-link nav-link-active") }}
+            activeProps={{
+              className: clsx("nav-link", "nav-link-active", {
+                "nav-link-collapsed": isCollapsed,
+              }),
+            }}
+            title={label}
           >
-            <Icon className="nav-icon" />
-            <span>{label}</span>
+            <Icon className="nav-icon" size={18} />
+            {!isCollapsed && <span>{label}</span>}
           </Link>
         ))}
       </nav>
@@ -44,6 +70,26 @@ Sidebar.flair = css`
     display: flex;
     flex-direction: column;
     gap: 24px;
+    transition:
+      width 0.2s ease,
+      padding 0.2s ease;
+  }
+
+  .sidebar-collapsed {
+    width: 72px;
+    padding: 20px 10px;
+
+    .brand {
+      justify-content: center;
+    }
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    justify-content: start;
+    gap: 8px;
+    position: relative;
   }
 
   .brand-name {
@@ -51,6 +97,35 @@ Sidebar.flair = css`
     font-size: 1.3rem;
     font-weight: 700;
     color: $colors.primary;
+  }
+
+  .collapse-btn {
+    width: 28px;
+    height: 28px;
+    position: absolute;
+    right: -14px;
+    border: none;
+    border-radius: $radii.card;
+    background: transparent;
+    color: $colors.text-muted;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    transform: translate(0, 0);
+    transition:
+      background-color 0.2s ease,
+      color 0.2s ease,
+      transform 0.2s ease;
+  }
+
+  .collapse-btn-collapsed {
+    right: 0px;
+    transform: translate(50%, 0);
+  }
+
+  .collapse-btn:hover {
+    background-color: $colors.surface-bright;
+    color: $colors.text;
   }
 
   .nav {
@@ -69,6 +144,11 @@ Sidebar.flair = css`
     text-decoration: none;
     font-size: 0.88rem;
     font-weight: 500;
+  }
+
+  .nav-link-collapsed {
+    justify-content: center;
+    padding: 10px 8px;
   }
 
   .nav-link:hover {
