@@ -106,6 +106,8 @@ pub struct ModesState {
     modes: Mutex<Vec<Mode>>,
     known_apps: Mutex<HashMap<String, KnownApp>>,
     applied_paths: Mutex<HashSet<String>>,
+    self_path: Option<String>,
+    self_path_key: Option<String>,
 }
 
 impl ModesState {
@@ -123,6 +125,10 @@ impl ModesState {
             .into_iter()
             .map(|app| (normalize_path_key(&app.path), app))
             .collect();
+        let self_path = std::env::current_exe()
+            .ok()
+            .map(|p| p.to_string_lossy().to_string());
+        let self_path_key = self_path.as_deref().map(normalize_path_key);
 
         Self {
             modes_path,
@@ -130,7 +136,16 @@ impl ModesState {
             modes: Mutex::new(modes),
             known_apps: Mutex::new(known_apps),
             applied_paths: Mutex::new(HashSet::new()),
+            self_path,
+            self_path_key,
         }
+    }
+
+    fn is_self_path(&self, normalized_path: &str) -> bool {
+        self.self_path_key
+            .as_deref()
+            .map(|key| key == normalized_path)
+            .unwrap_or(false)
     }
 
     fn save_modes(&self, modes: &[Mode]) {
@@ -169,6 +184,10 @@ impl ModesState {
     /// "Block all except": blocked when the path does *not* match a matcher
     /// (i.e. it isn't one of the allowed exceptions).
     pub fn is_blocked_by_active_mode(&self, normalized_path: &str) -> bool {
+        if self.is_self_path(normalized_path) {
+            return false;
+        }
+
         let Some(mode) = self.active_mode() else {
             return false;
         };
@@ -261,6 +280,10 @@ impl ModesState {
         }
 
         let key = normalize_path_key(path);
+        if self.is_self_path(&key) {
+            return false;
+        }
+
         let now = current_epoch_secs();
         let mut apps = self.known_apps.lock().unwrap_or_else(|e| e.into_inner());
         let is_new = !apps.contains_key(&key);
@@ -282,6 +305,7 @@ impl ModesState {
         let apps = self.known_apps.lock().unwrap_or_else(|e| e.into_inner());
         let mut list: Vec<KnownAppDto> = apps
             .values()
+            .filter(|app| !self.is_self_path(&normalize_path_key(&app.path)))
             .map(|app| KnownAppDto {
                 path: app.path.clone(),
                 name: app.name.clone(),
@@ -296,6 +320,10 @@ impl ModesState {
     /// Looks up the original (non-normalized) path for a known app, given its
     /// normalized key. Used to pass a real filesystem path to firewall calls.
     pub fn original_path_for(&self, normalized: &str) -> Option<String> {
+        if self.is_self_path(normalized) {
+            return self.self_path.clone();
+        }
+
         self.known_apps
             .lock()
             .unwrap_or_else(|e| e.into_inner())
@@ -310,10 +338,20 @@ impl ModesState {
         let mut candidates: HashSet<String> = known.keys().cloned().collect();
         candidates.extend(observed_paths.iter().cloned());
 
-        candidates
+        let mut matched: HashSet<String> = candidates
             .into_iter()
             .filter(|path| mode.matchers.iter().any(|m| matcher_matches(m, path)))
-            .collect()
+            .collect();
+
+        matched.retain(|path| !self.is_self_path(path));
+
+        if mode.mode_type == ModeType::BlockAllExcept {
+            if let Some(path_key) = &self.self_path_key {
+                matched.insert(path_key.clone());
+            }
+        }
+
+        matched
     }
 
     /// Diffs `matched` against the previously applied path set, returning
