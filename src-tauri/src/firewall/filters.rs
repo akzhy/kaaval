@@ -8,10 +8,11 @@ use windows::Win32::Foundation::{ERROR_SUCCESS, HANDLE};
 use windows::Win32::NetworkManagement::WindowsFilteringPlatform::{
     FwpmFilterAdd0, FwpmFilterCreateEnumHandle0, FwpmFilterDeleteByKey0,
     FwpmFilterDestroyEnumHandle0, FwpmFilterEnum0, FwpmFilterGetByKey0, FwpmFreeMemory0,
-    FWPM_ACTION0, FWPM_CONDITION_ALE_APP_ID, FWPM_CONDITION_IP_PROTOCOL, FWPM_DISPLAY_DATA0,
-    FWPM_FILTER0, FWPM_FILTER_CONDITION0, FWPM_FILTER_ENUM_TEMPLATE0, FWPM_FILTER_FLAGS,
-    FWPM_FILTER_FLAG_CLEAR_ACTION_RIGHT, FWP_ACTION_BLOCK, FWP_ACTION_TYPE, FWP_BYTE_BLOB,
-    FWP_BYTE_BLOB_TYPE, FWP_CONDITION_VALUE0, FWP_MATCH_EQUAL, FWP_UINT8, FWP_VALUE0, FWP_VALUE0_0,
+    FWPM_ACTION0, FWPM_CONDITION_ALE_APP_ID, FWPM_CONDITION_FLAGS, FWPM_CONDITION_IP_PROTOCOL,
+    FWPM_DISPLAY_DATA0, FWPM_FILTER0, FWPM_FILTER_CONDITION0, FWPM_FILTER_ENUM_TEMPLATE0,
+    FWPM_FILTER_FLAGS, FWPM_FILTER_FLAG_CLEAR_ACTION_RIGHT, FWP_ACTION_BLOCK, FWP_ACTION_TYPE,
+    FWP_BYTE_BLOB, FWP_BYTE_BLOB_TYPE, FWP_CONDITION_FLAG_IS_LOOPBACK, FWP_CONDITION_VALUE0,
+    FWP_MATCH_EQUAL, FWP_MATCH_FLAGS_NONE_SET, FWP_UINT32, FWP_UINT8, FWP_VALUE0, FWP_VALUE0_0,
 };
 
 const FWP_E_FILTER_NOT_FOUND: u32 = 0x8032_0003;
@@ -133,6 +134,16 @@ pub fn add_block_filters(engine: &EngineHandle, exe_path: &str, app_id: &AppIdBl
                     r#type: FWP_UINT8,
                     Anonymous: windows::Win32::NetworkManagement::WindowsFilteringPlatform::FWP_CONDITION_VALUE0_0 {
                         uint8: spec.protocol,
+                    },
+                },
+            },
+            FWPM_FILTER_CONDITION0 {
+                fieldKey: FWPM_CONDITION_FLAGS,
+                matchType: FWP_MATCH_FLAGS_NONE_SET,
+                conditionValue: FWP_CONDITION_VALUE0 {
+                    r#type: FWP_UINT32,
+                    Anonymous: windows::Win32::NetworkManagement::WindowsFilteringPlatform::FWP_CONDITION_VALUE0_0 {
+                        uint32: FWP_CONDITION_FLAG_IS_LOOPBACK,
                     },
                 },
             },
@@ -446,7 +457,10 @@ pub fn add_tagged_app_filters(
             "Kaaval {tag} {} {}: {}",
             spec.protocol_name, spec.ip_version, exe_path
         );
-        let description = format!("{RULE_DESCRIPTION} {} {} ({tag})", spec.protocol_name, spec.ip_version);
+        let description = format!(
+            "{RULE_DESCRIPTION} {} {} ({tag})",
+            spec.protocol_name, spec.ip_version
+        );
 
         let mut display_name_w = to_wide_null(&display_name);
         let mut description_w = to_wide_null(&description);
@@ -498,7 +512,12 @@ pub fn add_tagged_app_filters(
             ..Default::default()
         };
 
-        debug!(tag, exe = exe_path, protocol = spec.protocol_name, "creating tagged WFP filter");
+        debug!(
+            tag,
+            exe = exe_path,
+            protocol = spec.protocol_name,
+            "creating tagged WFP filter"
+        );
         // SAFETY: filter and condition buffers remain alive for call duration; output id not needed.
         let status = unsafe { FwpmFilterAdd0(engine.raw(), &filter, None, None) };
         if status != ERROR_SUCCESS.0 {
@@ -515,7 +534,10 @@ pub fn delete_tagged_app_filters(engine: &EngineHandle, tag: &str, exe_path: &st
         let filter_key = tagged_filter_key(tag, exe_path, spec);
         // SAFETY: engine handle is valid and key pointer references a valid GUID.
         let status = unsafe { FwpmFilterDeleteByKey0(engine.raw(), &filter_key) };
-        if status == ERROR_SUCCESS.0 || status == FWP_E_NOT_FOUND || status == FWP_E_FILTER_NOT_FOUND {
+        if status == ERROR_SUCCESS.0
+            || status == FWP_E_NOT_FOUND
+            || status == FWP_E_FILTER_NOT_FOUND
+        {
             continue;
         }
         return Err(FirewallError::from_win32("FwpmFilterDeleteByKey0", status));
@@ -535,7 +557,10 @@ pub fn add_tagged_blanket_filters(
     for spec in FILTER_SPECS {
         let filter_key = tagged_blanket_filter_key(tag, spec);
         let display_name = format!("Kaaval {tag} {} {}", spec.protocol_name, spec.ip_version);
-        let description = format!("{RULE_DESCRIPTION} {} {} ({tag})", spec.protocol_name, spec.ip_version);
+        let description = format!(
+            "{RULE_DESCRIPTION} {} {} ({tag})",
+            spec.protocol_name, spec.ip_version
+        );
 
         let mut display_name_w = to_wide_null(&display_name);
         let mut description_w = to_wide_null(&description);
@@ -575,7 +600,11 @@ pub fn add_tagged_blanket_filters(
             ..Default::default()
         };
 
-        debug!(tag, protocol = spec.protocol_name, "creating tagged blanket WFP filter");
+        debug!(
+            tag,
+            protocol = spec.protocol_name,
+            "creating tagged blanket WFP filter"
+        );
         // SAFETY: filter and condition buffers remain alive for call duration; output id not needed.
         let status = unsafe { FwpmFilterAdd0(engine.raw(), &filter, None, None) };
         if status != ERROR_SUCCESS.0 {
@@ -592,7 +621,10 @@ pub fn delete_tagged_blanket_filters(engine: &EngineHandle, tag: &str) -> Result
         let filter_key = tagged_blanket_filter_key(tag, spec);
         // SAFETY: engine handle is valid and key pointer references a valid GUID.
         let status = unsafe { FwpmFilterDeleteByKey0(engine.raw(), &filter_key) };
-        if status == ERROR_SUCCESS.0 || status == FWP_E_NOT_FOUND || status == FWP_E_FILTER_NOT_FOUND {
+        if status == ERROR_SUCCESS.0
+            || status == FWP_E_NOT_FOUND
+            || status == FWP_E_FILTER_NOT_FOUND
+        {
             continue;
         }
         return Err(FirewallError::from_win32("FwpmFilterDeleteByKey0", status));
