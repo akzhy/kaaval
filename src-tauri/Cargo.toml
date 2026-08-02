@@ -25,7 +25,7 @@ serde_json = "1"
 thiserror = "2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt", "std"] }
-uuid = { version = "1", features = ["v5", "serde"] }
+uuid = { version = "1", features = ["v4", "v5", "serde"] }
 windows = { version = "0.58", features = [
 	"Win32_Foundation",
 	"Win32_NetworkManagement_IpHelper",
@@ -36,4 +36,6 @@ windows = { version = "0.58", features = [
 	"Win32_System_Threading",
 	"Win32_System_Rpc",
 ] }
+tauri-plugin-dialog = "2.7.2"
+base64 = "0.23.0"
 

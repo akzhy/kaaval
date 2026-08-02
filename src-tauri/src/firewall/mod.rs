@@ -5,6 +5,11 @@
 
 use std::path::{Path, PathBuf};
 
+#[cfg(windows)]
+use windows::Win32::NetworkManagement::WindowsFilteringPlatform::{
+    FWP_ACTION_BLOCK, FWP_ACTION_PERMIT,
+};
+
 pub mod error;
 pub mod types;
 
@@ -166,7 +171,117 @@ impl FirewallManager {
             tx.commit()
         }
     }
+
+    /// Enables or disables the default-deny ("block all") base filters used by
+    /// "block all except" modes. Exceptions are layered on top via `set_mode_permit`.
+    pub fn set_default_deny(&self, enabled: bool) -> Result<()> {
+        #[cfg(not(windows))]
+        {
+            let _ = enabled;
+            return Err(FirewallError::UnsupportedPlatform);
+        }
+
+        #[cfg(windows)]
+        {
+            let tx = self.engine.transaction()?;
+            if enabled {
+                provider::ensure_provider_and_sublayer(&self.engine)?;
+                filters::add_tagged_blanket_filters(
+                    &self.engine,
+                    MODE_TAG_DEFAULT_DENY,
+                    FWP_ACTION_BLOCK,
+                    WEIGHT_DEFAULT_DENY,
+                )?;
+            } else {
+                filters::delete_tagged_blanket_filters(&self.engine, MODE_TAG_DEFAULT_DENY)?;
+            }
+            tx.commit()
+        }
+    }
+
+    /// Adds or removes a permit-exception filter for one executable, used by
+    /// "block all except" modes to carve out allowed apps above the default deny.
+    pub fn set_mode_permit<P: AsRef<Path>>(&self, exe: P, enabled: bool) -> Result<()> {
+        #[cfg(not(windows))]
+        {
+            let _ = (exe, enabled);
+            return Err(FirewallError::UnsupportedPlatform);
+        }
+
+        #[cfg(windows)]
+        {
+            let exe_path = normalize_exe_path(exe)?;
+            let exe_str = exe_path
+                .to_str()
+                .ok_or_else(|| FirewallError::InvalidUtf16Path(exe_path.clone()))?;
+
+            let tx = self.engine.transaction()?;
+            if enabled {
+                provider::ensure_provider_and_sublayer(&self.engine)?;
+                let app_id = app_id::AppIdBlob::from_executable_path(&exe_path)?;
+                filters::add_tagged_app_filters(
+                    &self.engine,
+                    MODE_TAG_PERMIT,
+                    exe_str,
+                    &app_id,
+                    FWP_ACTION_PERMIT,
+                    WEIGHT_MODE_PERMIT,
+                )?;
+            } else {
+                filters::delete_tagged_app_filters(&self.engine, MODE_TAG_PERMIT, exe_str)?;
+            }
+            tx.commit()
+        }
+    }
+
+    /// Adds or removes a mode-owned block filter for one executable, used by
+    /// "block these" modes. Independent from manual per-app blocks.
+    pub fn set_mode_block<P: AsRef<Path>>(&self, exe: P, enabled: bool) -> Result<()> {
+        #[cfg(not(windows))]
+        {
+            let _ = (exe, enabled);
+            return Err(FirewallError::UnsupportedPlatform);
+        }
+
+        #[cfg(windows)]
+        {
+            let exe_path = normalize_exe_path(exe)?;
+            let exe_str = exe_path
+                .to_str()
+                .ok_or_else(|| FirewallError::InvalidUtf16Path(exe_path.clone()))?;
+
+            let tx = self.engine.transaction()?;
+            if enabled {
+                provider::ensure_provider_and_sublayer(&self.engine)?;
+                let app_id = app_id::AppIdBlob::from_executable_path(&exe_path)?;
+                filters::add_tagged_app_filters(
+                    &self.engine,
+                    MODE_TAG_BLOCK,
+                    exe_str,
+                    &app_id,
+                    FWP_ACTION_BLOCK,
+                    WEIGHT_MODE_BLOCK,
+                )?;
+            } else {
+                filters::delete_tagged_app_filters(&self.engine, MODE_TAG_BLOCK, exe_str)?;
+            }
+            tx.commit()
+        }
+    }
 }
+
+#[cfg(windows)]
+const MODE_TAG_DEFAULT_DENY: &str = "default-deny";
+#[cfg(windows)]
+const MODE_TAG_PERMIT: &str = "mode-permit";
+#[cfg(windows)]
+const MODE_TAG_BLOCK: &str = "mode-block";
+#[cfg(windows)]
+const WEIGHT_DEFAULT_DENY: u8 = 0x01;
+#[cfg(windows)]
+const WEIGHT_MODE_PERMIT: u8 = 0x08;
+#[cfg(windows)]
+const WEIGHT_MODE_BLOCK: u8 = 0x0f;
 
 #[cfg(windows)]
 fn normalize_exe_path<P: AsRef<Path>>(exe: P) -> Result<PathBuf> {
@@ -175,8 +290,8 @@ fn normalize_exe_path<P: AsRef<Path>>(exe: P) -> Result<PathBuf> {
         return Err(FirewallError::InvalidPath("path is empty".to_string()));
     }
 
-    let canonical = std::fs::canonicalize(p)
-        .map_err(|_| FirewallError::ExecutableNotFound(p.to_path_buf()))?;
+    let canonical =
+        std::fs::canonicalize(p).map_err(|_| FirewallError::ExecutableNotFound(p.to_path_buf()))?;
 
     if !canonical.is_file() {
         return Err(FirewallError::InvalidPath(format!(

@@ -1,14 +1,18 @@
 mod firewall;
+mod modes;
 mod network;
 mod stats;
 
 use std::collections::HashSet;
 use std::sync::{Mutex, Once};
 
+use base64::Engine;
 use serde::Serialize;
+use tauri::Manager;
 use tracing::{error, info, warn};
 
 use firewall::{FirewallManager, FirewallRuleDto};
+use modes::{AppMatcher, KnownAppDto, Mode, ModeType, ModesState};
 use network::NetworkRequestDto;
 use stats::DashboardStatsDto;
 
@@ -95,7 +99,7 @@ fn remove_all_firewall_rules(state: tauri::State<'_, Mutex<FirewallState>>) -> R
 }
 
 #[tauri::command]
-fn list_network_requests(state: tauri::State<'_, Mutex<FirewallState>>) -> Result<Vec<NetworkRequestDto>, String> {
+fn list_network_requests(state: tauri::State<'_, Mutex<FirewallState>>, modes_state: tauri::State<'_, Mutex<ModesState>>) -> Result<Vec<NetworkRequestDto>, String> {
     info!("listing live network requests");
     let requests = network::list_network_requests()?;
 
@@ -122,6 +126,19 @@ fn list_network_requests(state: tauri::State<'_, Mutex<FirewallState>>) -> Resul
     })
     .unwrap_or_default();
 
+    {
+        let modes = modes_state.inner().lock().map_err(|_| "failed to lock modes state".to_string())?;
+        let mut observed = HashSet::new();
+        for row in &requests {
+            if row.app_path.starts_with("<pid:") {
+                continue;
+            }
+            modes.note_seen(&row.app_path, &row.app_name);
+            observed.insert(network::normalize_path_key(&row.app_path));
+        }
+        reconcile_active_mode(&modes, &state, &observed);
+    }
+
     Ok(network::to_dto_with_blocking(requests, &blocked_paths))
 }
 
@@ -138,6 +155,177 @@ fn get_dashboard_stats(state: tauri::State<'_, Mutex<FirewallState>>) -> Result<
     })
 }
 
+/// Applies or removes WFP enforcement for one mode's matched app, based on its type.
+fn apply_mode_enforcement(manager: &FirewallManager, mode_type: ModeType, path: &str, enabled: bool) {
+    let result = match mode_type {
+        ModeType::BlockAllExcept => manager.set_mode_permit(path, enabled),
+        ModeType::BlockThese => manager.set_mode_block(path, enabled),
+    };
+    if let Err(err) = result {
+        warn!(path, enabled, error = %err, "failed to sync mode enforcement for app");
+    }
+}
+
+/// Re-evaluates the active mode's matchers against known/observed apps and
+/// applies only the incremental filter changes needed (best-effort).
+fn reconcile_active_mode(modes_state: &ModesState, state: &tauri::State<'_, Mutex<FirewallState>>, observed: &HashSet<String>) {
+    let Some(mode) = modes_state.active_mode() else {
+        return;
+    };
+
+    let matched = modes_state.resolve_matches(&mode, observed);
+    let (to_add, to_remove) = modes_state.diff_applied(matched);
+    if to_add.is_empty() && to_remove.is_empty() {
+        return;
+    }
+
+    let _ = with_manager(state, |manager| {
+        for key in &to_add {
+            let path = modes_state.original_path_for(key).unwrap_or_else(|| key.clone());
+            apply_mode_enforcement(manager, mode.mode_type, &path, true);
+        }
+        for key in &to_remove {
+            let path = modes_state.original_path_for(key).unwrap_or_else(|| key.clone());
+            apply_mode_enforcement(manager, mode.mode_type, &path, false);
+        }
+        Ok(())
+    });
+}
+
+/// Tears down all enforcement (default-deny and/or per-app filters) for a mode.
+fn teardown_mode(modes_state: &ModesState, state: &tauri::State<'_, Mutex<FirewallState>>, mode: &Mode) {
+    let applied = modes_state.clear_applied();
+    let _ = with_manager(state, |manager| {
+        for key in &applied {
+            let path = modes_state.original_path_for(key).unwrap_or_else(|| key.clone());
+            apply_mode_enforcement(manager, mode.mode_type, &path, false);
+        }
+        if mode.mode_type == ModeType::BlockAllExcept {
+            if let Err(err) = manager.set_default_deny(false) {
+                warn!(error = %err, "failed to disable default-deny filters");
+            }
+        }
+        Ok(())
+    });
+}
+
+#[tauri::command]
+fn list_modes(modes_state: tauri::State<'_, Mutex<ModesState>>) -> Result<Vec<Mode>, String> {
+    let modes = modes_state.inner().lock().map_err(|_| "failed to lock modes state".to_string())?;
+    Ok(modes.list_modes())
+}
+
+#[tauri::command]
+fn list_known_apps(modes_state: tauri::State<'_, Mutex<ModesState>>) -> Result<Vec<KnownAppDto>, String> {
+    let modes = modes_state.inner().lock().map_err(|_| "failed to lock modes state".to_string())?;
+    Ok(modes.list_known_apps())
+}
+
+#[tauri::command]
+fn create_mode(
+    name: String,
+    icon_data_url: Option<String>,
+    mode_type: ModeType,
+    matchers: Vec<AppMatcher>,
+    modes_state: tauri::State<'_, Mutex<ModesState>>,
+) -> Result<Mode, String> {
+    let modes = modes_state.inner().lock().map_err(|_| "failed to lock modes state".to_string())?;
+    Ok(modes.create_mode(name, icon_data_url, mode_type, matchers))
+}
+
+#[tauri::command]
+fn update_mode(
+    id: String,
+    name: String,
+    icon_data_url: Option<String>,
+    mode_type: ModeType,
+    matchers: Vec<AppMatcher>,
+    modes_state: tauri::State<'_, Mutex<ModesState>>,
+) -> Result<Mode, String> {
+    let modes = modes_state.inner().lock().map_err(|_| "failed to lock modes state".to_string())?;
+    modes.update_mode(&id, name, icon_data_url, mode_type, matchers)
+}
+
+#[tauri::command]
+fn delete_mode(
+    id: String,
+    modes_state: tauri::State<'_, Mutex<ModesState>>,
+    state: tauri::State<'_, Mutex<FirewallState>>,
+) -> Result<(), String> {
+    let modes = modes_state.inner().lock().map_err(|_| "failed to lock modes state".to_string())?;
+    let removed = modes.delete_mode(&id)?;
+    if removed.active {
+        teardown_mode(&modes, &state, &removed);
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn set_mode_active(
+    id: String,
+    active: bool,
+    modes_state: tauri::State<'_, Mutex<ModesState>>,
+    state: tauri::State<'_, Mutex<FirewallState>>,
+) -> Result<Mode, String> {
+    let modes = modes_state.inner().lock().map_err(|_| "failed to lock modes state".to_string())?;
+
+    if let Some(previous) = modes.active_mode() {
+        if previous.id != id || !active {
+            teardown_mode(&modes, &state, &previous);
+        }
+    }
+
+    let updated = modes.set_active(&id, active)?;
+
+    if active {
+        if updated.mode_type == ModeType::BlockAllExcept {
+            with_manager(&state, |manager| manager.set_default_deny(true))?;
+        }
+        reconcile_active_mode(&modes, &state, &HashSet::new());
+    }
+
+    Ok(updated)
+}
+
+#[tauri::command]
+fn pick_executable_path(app: tauri::AppHandle) -> Option<String> {
+    use tauri_plugin_dialog::DialogExt;
+    let picked = app
+        .dialog()
+        .file()
+        .add_filter("Executable", &["exe"])
+        .blocking_pick_file()?;
+    picked.into_path().ok().map(|p| p.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+fn pick_icon_data_url(app: tauri::AppHandle) -> Option<String> {
+    use tauri_plugin_dialog::DialogExt;
+    let picked = app
+        .dialog()
+        .file()
+        .add_filter("Image", &["png", "jpg", "jpeg", "ico", "webp", "svg"])
+        .blocking_pick_file()?;
+    let path = picked.into_path().ok()?;
+    let bytes = std::fs::read(&path).ok()?;
+    let mime = match path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "ico" => "image/x-icon",
+        "webp" => "image/webp",
+        "svg" => "image/svg+xml",
+        _ => "application/octet-stream",
+    };
+    let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
+    Some(format!("data:{mime};base64,{encoded}"))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     static TRACING_INIT: Once = Once::new();
@@ -150,7 +338,13 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(Mutex::new(FirewallState::init()))
+        .setup(|app| {
+            let data_dir = app.path().app_data_dir()?;
+            app.manage(Mutex::new(ModesState::init(data_dir)));
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             block_application,
             unblock_application,
@@ -158,7 +352,15 @@ pub fn run() {
             list_firewall_rules,
             remove_all_firewall_rules,
             list_network_requests,
-            get_dashboard_stats
+            get_dashboard_stats,
+            list_modes,
+            list_known_apps,
+            create_mode,
+            update_mode,
+            delete_mode,
+            set_mode_active,
+            pick_executable_path,
+            pick_icon_data_url
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -393,6 +393,204 @@ fn extract_exe_path_from_filter(filter: &FWPM_FILTER0) -> Result<PathBuf> {
     Err(FirewallError::AppIdDecode)
 }
 
+/// Builds a filter key namespaced by `tag` so mode-owned filters never collide
+/// with the manual per-app block filters keyed by `deterministic_filter_key`.
+fn tagged_filter_key(tag: &str, exe: &str, spec: FilterSpec) -> GUID {
+    let material = format!(
+        "{tag}|{}|{}|{}|{}",
+        exe.to_ascii_lowercase(),
+        spec.protocol,
+        spec.ip_version,
+        spec.layer_key.to_u128()
+    );
+    let uuid = Uuid::new_v5(&RULE_NAMESPACE, material.as_bytes());
+    GUID::from_u128(uuid.as_u128())
+}
+
+/// Same as `tagged_filter_key` but for filters with no app-id condition
+/// (i.e. one filter per protocol/IP version, not per executable).
+fn tagged_blanket_filter_key(tag: &str, spec: FilterSpec) -> GUID {
+    let material = format!(
+        "{tag}|*|{}|{}|{}",
+        spec.protocol,
+        spec.ip_version,
+        spec.layer_key.to_u128()
+    );
+    let uuid = Uuid::new_v5(&RULE_NAMESPACE, material.as_bytes());
+    GUID::from_u128(uuid.as_u128())
+}
+
+/// Creates per-executable filters (scoped by app id) for a mode, tagged so they
+/// can be added/removed independently of manual blocks and other mode tags.
+pub fn add_tagged_app_filters(
+    engine: &EngineHandle,
+    tag: &str,
+    exe_path: &str,
+    app_id: &AppIdBlob,
+    action: FWP_ACTION_TYPE,
+    weight: u8,
+) -> Result<()> {
+    for spec in FILTER_SPECS {
+        let filter_key = tagged_filter_key(tag, exe_path, spec);
+        let display_name = format!(
+            "Kaval {tag} {} {}: {}",
+            spec.protocol_name, spec.ip_version, exe_path
+        );
+        let description = format!("{RULE_DESCRIPTION} {} {} ({tag})", spec.protocol_name, spec.ip_version);
+
+        let mut display_name_w = to_wide_null(&display_name);
+        let mut description_w = to_wide_null(&description);
+
+        let mut conditions = [
+            FWPM_FILTER_CONDITION0 {
+                fieldKey: FWPM_CONDITION_ALE_APP_ID,
+                matchType: FWP_MATCH_EQUAL,
+                conditionValue: FWP_CONDITION_VALUE0 {
+                    r#type: FWP_BYTE_BLOB_TYPE,
+                    Anonymous: windows::Win32::NetworkManagement::WindowsFilteringPlatform::FWP_CONDITION_VALUE0_0 {
+                        byteBlob: app_id.as_ptr() as *mut FWP_BYTE_BLOB,
+                    },
+                },
+            },
+            FWPM_FILTER_CONDITION0 {
+                fieldKey: FWPM_CONDITION_IP_PROTOCOL,
+                matchType: FWP_MATCH_EQUAL,
+                conditionValue: FWP_CONDITION_VALUE0 {
+                    r#type: FWP_UINT8,
+                    Anonymous: windows::Win32::NetworkManagement::WindowsFilteringPlatform::FWP_CONDITION_VALUE0_0 {
+                        uint8: spec.protocol,
+                    },
+                },
+            },
+        ];
+
+        let filter = FWPM_FILTER0 {
+            filterKey: filter_key,
+            displayData: FWPM_DISPLAY_DATA0 {
+                name: PWSTR(display_name_w.as_mut_ptr()),
+                description: PWSTR(description_w.as_mut_ptr()),
+            },
+            flags: FWPM_FILTER_FLAGS(FWPM_FILTER_FLAG_CLEAR_ACTION_RIGHT.0),
+            providerKey: &PROVIDER_KEY as *const GUID as *mut GUID,
+            providerData: Default::default(),
+            layerKey: spec.layer_key,
+            subLayerKey: SUBLAYER_KEY,
+            weight: FWP_VALUE0 {
+                r#type: FWP_UINT8,
+                Anonymous: FWP_VALUE0_0 { uint8: weight },
+            },
+            numFilterConditions: conditions.len() as u32,
+            filterCondition: conditions.as_mut_ptr(),
+            action: FWPM_ACTION0 {
+                r#type: action,
+                Anonymous: Default::default(),
+            },
+            ..Default::default()
+        };
+
+        debug!(tag, exe = exe_path, protocol = spec.protocol_name, "creating tagged WFP filter");
+        // SAFETY: filter and condition buffers remain alive for call duration; output id not needed.
+        let status = unsafe { FwpmFilterAdd0(engine.raw(), &filter, None, None) };
+        if status != ERROR_SUCCESS.0 {
+            return Err(FirewallError::from_win32("FwpmFilterAdd0", status));
+        }
+    }
+
+    Ok(())
+}
+
+/// Deletes the tagged per-executable filters created by `add_tagged_app_filters`.
+pub fn delete_tagged_app_filters(engine: &EngineHandle, tag: &str, exe_path: &str) -> Result<()> {
+    for spec in FILTER_SPECS {
+        let filter_key = tagged_filter_key(tag, exe_path, spec);
+        // SAFETY: engine handle is valid and key pointer references a valid GUID.
+        let status = unsafe { FwpmFilterDeleteByKey0(engine.raw(), &filter_key) };
+        if status == ERROR_SUCCESS.0 || status == FWP_E_NOT_FOUND || status == FWP_E_FILTER_NOT_FOUND {
+            continue;
+        }
+        return Err(FirewallError::from_win32("FwpmFilterDeleteByKey0", status));
+    }
+
+    Ok(())
+}
+
+/// Creates filters with no app-id condition (i.e. matching every executable)
+/// for the given protocol/IP version combinations. Used for default-deny.
+pub fn add_tagged_blanket_filters(
+    engine: &EngineHandle,
+    tag: &str,
+    action: FWP_ACTION_TYPE,
+    weight: u8,
+) -> Result<()> {
+    for spec in FILTER_SPECS {
+        let filter_key = tagged_blanket_filter_key(tag, spec);
+        let display_name = format!("Kaval {tag} {} {}", spec.protocol_name, spec.ip_version);
+        let description = format!("{RULE_DESCRIPTION} {} {} ({tag})", spec.protocol_name, spec.ip_version);
+
+        let mut display_name_w = to_wide_null(&display_name);
+        let mut description_w = to_wide_null(&description);
+
+        let mut conditions = [FWPM_FILTER_CONDITION0 {
+            fieldKey: FWPM_CONDITION_IP_PROTOCOL,
+            matchType: FWP_MATCH_EQUAL,
+            conditionValue: FWP_CONDITION_VALUE0 {
+                r#type: FWP_UINT8,
+                Anonymous: windows::Win32::NetworkManagement::WindowsFilteringPlatform::FWP_CONDITION_VALUE0_0 {
+                    uint8: spec.protocol,
+                },
+            },
+        }];
+
+        let filter = FWPM_FILTER0 {
+            filterKey: filter_key,
+            displayData: FWPM_DISPLAY_DATA0 {
+                name: PWSTR(display_name_w.as_mut_ptr()),
+                description: PWSTR(description_w.as_mut_ptr()),
+            },
+            flags: FWPM_FILTER_FLAGS(FWPM_FILTER_FLAG_CLEAR_ACTION_RIGHT.0),
+            providerKey: &PROVIDER_KEY as *const GUID as *mut GUID,
+            providerData: Default::default(),
+            layerKey: spec.layer_key,
+            subLayerKey: SUBLAYER_KEY,
+            weight: FWP_VALUE0 {
+                r#type: FWP_UINT8,
+                Anonymous: FWP_VALUE0_0 { uint8: weight },
+            },
+            numFilterConditions: conditions.len() as u32,
+            filterCondition: conditions.as_mut_ptr(),
+            action: FWPM_ACTION0 {
+                r#type: action,
+                Anonymous: Default::default(),
+            },
+            ..Default::default()
+        };
+
+        debug!(tag, protocol = spec.protocol_name, "creating tagged blanket WFP filter");
+        // SAFETY: filter and condition buffers remain alive for call duration; output id not needed.
+        let status = unsafe { FwpmFilterAdd0(engine.raw(), &filter, None, None) };
+        if status != ERROR_SUCCESS.0 {
+            return Err(FirewallError::from_win32("FwpmFilterAdd0", status));
+        }
+    }
+
+    Ok(())
+}
+
+/// Deletes the blanket filters created by `add_tagged_blanket_filters`.
+pub fn delete_tagged_blanket_filters(engine: &EngineHandle, tag: &str) -> Result<()> {
+    for spec in FILTER_SPECS {
+        let filter_key = tagged_blanket_filter_key(tag, spec);
+        // SAFETY: engine handle is valid and key pointer references a valid GUID.
+        let status = unsafe { FwpmFilterDeleteByKey0(engine.raw(), &filter_key) };
+        if status == ERROR_SUCCESS.0 || status == FWP_E_NOT_FOUND || status == FWP_E_FILTER_NOT_FOUND {
+            continue;
+        }
+        return Err(FirewallError::from_win32("FwpmFilterDeleteByKey0", status));
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use uuid::Uuid;

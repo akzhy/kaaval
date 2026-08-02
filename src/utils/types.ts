@@ -27,3 +27,27 @@ export type DashboardStats = {
   active_sessions: number;
   blocked_today: number;
 };
+
+export type MatcherKind = "path" | "directory" | "name";
+
+export type AppMatcher = {
+  kind: MatcherKind;
+  value: string;
+};
+
+export type ModeType = "block_all_except" | "block_these";
+
+export type Mode = {
+  id: string;
+  name: string;
+  icon_data_url: string | null;
+  mode_type: ModeType;
+  matchers: AppMatcher[];
+  active: boolean;
+};
+
+export type KnownApp = {
+  path: string;
+  name: string;
+  last_seen_secs: number;
+};

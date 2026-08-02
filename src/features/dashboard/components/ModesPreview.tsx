@@ -1,23 +1,20 @@
+import { useEffect } from "react";
 import { Link } from "@tanstack/react-router";
 import { css } from "@flairjs/client";
 import Card from "@/components/Card";
-
-const PLACEHOLDER_MODES = [
-  {
-    name: "Valorant Mode",
-    active: true,
-    priority: "High",
-    allowed: ["valorant.exe", "riot.exe", "vanguard.sys", "discord.exe"],
-  },
-  {
-    name: "Work Mode",
-    active: false,
-    priority: "Medium",
-    allowed: ["teams.exe", "outlook.exe", "vscode.exe"],
-  },
-];
+import { useModesStore } from "@/store/modesStore";
 
 function ModesPreview() {
+  const modes = useModesStore((state) => state.modes);
+  const refresh = useModesStore((state) => state.refresh);
+  const setActive = useModesStore((state) => state.setActive);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  const preview = modes.slice(0, 2);
+
   return (
     <section className="modes-preview">
       <div className="modes-preview-head">
@@ -30,41 +27,54 @@ function ModesPreview() {
       </div>
 
       <div className="modes-preview-grid">
-        {PLACEHOLDER_MODES.map((mode) => (
-          <Card key={mode.name}>
-            <div className="mode-card">
-              <div className="mode-card-head">
-                <p className="mode-card-name">{mode.name}</p>
-                <span className={mode.active ? "mode-status mode-status-active" : "mode-status"}>
-                  {mode.active ? "Active" : "Inactive"}
-                </span>
-              </div>
-              <p className="mode-card-label">Allowed Processes:</p>
-              <div className="mode-card-chips">
-                {mode.allowed.map((item) => (
-                  <span key={item} className="mode-chip">
-                    {item}
+        {preview.length === 0 ? (
+          <p className="modes-preview-empty">No modes yet. Create one from the Modes page.</p>
+        ) : (
+          preview.map((mode) => (
+            <Card key={mode.id}>
+              <div className="mode-card">
+                <div className="mode-card-head">
+                  <p className="mode-card-name">{mode.name}</p>
+                  <span className={mode.active ? "mode-status mode-status-active" : "mode-status"}>
+                    {mode.active ? "Active" : "Inactive"}
                   </span>
-                ))}
+                </div>
+                <p className="mode-card-label">
+                  {mode.mode_type === "block_all_except" ? "Block all except:" : "Blocked applications:"}
+                </p>
+                <div className="mode-card-chips">
+                  {mode.matchers.slice(0, 4).map((matcher) => (
+                    <span key={`${matcher.kind}:${matcher.value}`} className="mode-chip">
+                      {matcher.value}
+                    </span>
+                  ))}
+                </div>
+                <div className="mode-card-footer">
+                  <button
+                    type="button"
+                    className="modes-preview-toggle"
+                    onClick={() => void setActive(mode.id, !mode.active)}
+                  >
+                    {mode.active ? "Deactivate" : "Activate"}
+                  </button>
+                </div>
               </div>
-              <div className="mode-card-footer">
-                <span className="mode-card-priority">Priority Level: {mode.priority}</span>
-              </div>
-            </div>
-          </Card>
-        ))}
+            </Card>
+          ))
+        )}
 
         <Card dashed>
-          <div className="mode-create">
+          <Link to="/modes" className="mode-create">
             <span className="mode-create-icon">+</span>
             <p className="mode-create-title">Create New Mode</p>
             <p className="mode-create-hint">Define custom rules for apps and protocols</p>
-          </div>
+          </Link>
         </Card>
       </div>
     </section>
   );
 }
+
 
 ModesPreview.flair = css`
   .modes-preview {
@@ -90,6 +100,12 @@ ModesPreview.flair = css`
     color: $colors.primary;
     font-size: 0.82rem;
     text-decoration: none;
+  }
+
+  .modes-preview-empty {
+    margin: 0;
+    font-size: 0.82rem;
+    color: $colors.text-muted;
   }
 
   .modes-preview-grid {
@@ -156,6 +172,17 @@ ModesPreview.flair = css`
     color: $colors.text-muted;
   }
 
+  .modes-preview-toggle {
+    background: none;
+    border: 1px solid $colors.border;
+    border-radius: $radii.card;
+    padding: 4px 10px;
+    color: $colors.primary;
+    font-size: 0.74rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
   .mode-create {
     display: flex;
     flex-direction: column;
@@ -166,6 +193,7 @@ ModesPreview.flair = css`
     height: 100%;
     min-height: 120px;
     color: $colors.text-muted;
+    text-decoration: none;
   }
 
   .mode-create-icon {
