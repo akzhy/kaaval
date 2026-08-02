@@ -1,5 +1,6 @@
 import { css } from "@flairjs/client";
 import { formatMbps } from "@/utils/format";
+import { Line, LineChart, ResponsiveContainer, Tooltip, YAxis } from "recharts";
 
 type ThroughputChartProps = {
   history: number[];
@@ -7,24 +8,62 @@ type ThroughputChartProps = {
 };
 
 function ThroughputChart({ history, current }: ThroughputChartProps) {
-  const max = Math.max(1, ...history);
+  const chartData = history.map((value, index) => ({
+    sample: index,
+    value,
+  }));
 
   return (
     <div className="throughput">
       <div className="throughput-head">
         <div>
           <p className="throughput-title">Network Throughput</p>
-          <p className="throughput-subtitle">Real-time outbound/inbound data packets</p>
+          <p className="throughput-subtitle">
+            Real-time outbound/inbound data packets
+          </p>
         </div>
         <p className="throughput-value">{formatMbps(current)}</p>
       </div>
-      <div className="throughput-bars">
+      <div className="throughput-chart">
         {history.length === 0 ? (
           <p className="throughput-empty">Collecting samples…</p>
         ) : (
-          history.map((value, index) => (
-            <div key={index} className="throughput-bar" style={{ height: `${Math.max(6, (value / max) * 100)}%` }} />
-          ))
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart
+              data={chartData}
+              margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
+            >
+              <YAxis hide domain={[0, "dataMax + 1"]} />
+              <Tooltip
+                cursor={{ stroke: "rgba(120, 138, 165, 0.28)", strokeWidth: 1 }}
+                formatter={(value) => {
+                  const numericValue =
+                    typeof value === "number" ? value : Number(value ?? 0);
+                  return formatMbps(
+                    Number.isFinite(numericValue) ? numericValue : 0,
+                  );
+                }}
+                labelFormatter={() => "Throughput"}
+                contentStyle={{
+                  borderRadius: 10,
+                  border: "1px solid rgba(120, 138, 165, 0.25)",
+                  background: "rgba(15, 23, 42, 0.92)",
+                  color: "#e2e8f0",
+                  fontSize: "0.75rem",
+                }}
+                itemStyle={{ color: "#e2e8f0" }}
+              />
+              <Line
+                type="monotone"
+                dataKey="value"
+                stroke="var(--kaaval-colors-primary)"
+                strokeWidth={2}
+                dot={false}
+                activeDot={{ r: 3 }}
+                isAnimationActive={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
         )}
       </div>
     </div>
@@ -65,20 +104,12 @@ ThroughputChart.flair = css`
     color: $colors.primary;
   }
 
-  .throughput-bars {
+  .throughput-chart {
     flex: 1;
-    display: flex;
-    align-items: flex-end;
-    gap: 8px;
+    width: 100%;
     min-height: 120px;
-  }
-
-  .throughput-bar {
-    flex: 1;
-    background-color: $colors.primary;
     border-radius: $radii.card;
-    opacity: 0.85;
-    min-height: 6px;
+    overflow: hidden;
   }
 
   .throughput-empty {
