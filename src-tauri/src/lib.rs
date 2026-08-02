@@ -1,4 +1,4 @@
-mod firewall;
+pub mod firewall;
 mod modes;
 mod network;
 mod stats;
@@ -109,7 +109,7 @@ fn list_network_requests(state: tauri::State<'_, Mutex<FirewallState>>, modes_st
         .filter(|p| !p.starts_with("<pid:"))
         .collect::<HashSet<_>>();
 
-    let blocked_paths = with_manager(&state, |manager| {
+    let mut blocked_paths = with_manager(&state, |manager| {
         let mut blocked = HashSet::new();
         for path in &distinct_paths {
             match manager.is_blocked(path) {
@@ -136,6 +136,16 @@ fn list_network_requests(state: tauri::State<'_, Mutex<FirewallState>>, modes_st
             modes.note_seen(&row.app_path, &row.app_name);
             observed.insert(network::normalize_path_key(&row.app_path));
         }
+
+        // A mode can block apps (default-deny, or an explicit block list) even
+        // when no manual per-app rule exists, so merge that in here too.
+        for path in &distinct_paths {
+            let key = network::normalize_path_key(path);
+            if modes.is_blocked_by_active_mode(&key) {
+                blocked_paths.insert(key);
+            }
+        }
+
         reconcile_active_mode(&modes, &state, &observed);
     }
 

@@ -162,6 +162,24 @@ impl ModesState {
             .cloned()
     }
 
+    /// Returns true if `normalized_path` is blocked as a side effect of the
+    /// active mode's rules, independent of any manual per-app block.
+    ///
+    /// "Block these": blocked when the path matches a matcher.
+    /// "Block all except": blocked when the path does *not* match a matcher
+    /// (i.e. it isn't one of the allowed exceptions).
+    pub fn is_blocked_by_active_mode(&self, normalized_path: &str) -> bool {
+        let Some(mode) = self.active_mode() else {
+            return false;
+        };
+
+        let matches = mode.matchers.iter().any(|m| matcher_matches(m, normalized_path));
+        match mode.mode_type {
+            ModeType::BlockThese => matches,
+            ModeType::BlockAllExcept => !matches,
+        }
+    }
+
     pub fn create_mode(
         &self,
         name: String,
