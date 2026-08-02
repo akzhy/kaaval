@@ -18,7 +18,7 @@ This project now includes a Windows-only backend that manages outbound block rul
 - Lists all WFP filters created by this application.
 - Removes all WFP filters created by this application.
 
-The backend owns a provider named `Kaval Firewall` and uses only its own provider/sublayer scope, so it does not modify unrelated Windows Firewall rules.
+The backend owns a provider named `Kaaval Firewall` and uses only its own provider/sublayer scope, so it does not modify unrelated Windows Firewall rules.
 
 ### Why these WFP layers are used
 

@@ -1,12 +1,12 @@
 [package]
-name = "netblocker"
+name = "kaaval"
 version = "0.1.0"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
 # Tauri's dev/build commands run `cargo run`/`cargo build` without `--bin`;
-# pin the default so the kaval-reset CLI binary doesn't make that ambiguous.
-default-run = "netblocker"
+# pin the default so the kaaval-reset CLI binary doesn't make that ambiguous.
+default-run = "kaaval"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -14,7 +14,7 @@ default-run = "netblocker"
 # The `_lib` suffix may seem redundant but it is necessary
 # to make the lib name unique and wouldn't conflict with the bin name.
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
-name = "netblocker_lib"
+name = "kaaval_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

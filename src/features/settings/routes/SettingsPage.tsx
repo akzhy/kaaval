@@ -7,7 +7,7 @@ function SettingsPage() {
       <div className="settings-page-head">
         <p className="settings-page-title">Settings</p>
         <p className="settings-page-subtitle">
-          General preferences for Kaval. More options coming soon.
+          General preferences for Kaaval. More options coming soon.
         </p>
       </div>
 
@@ -15,7 +15,7 @@ function SettingsPage() {
         <div className="settings-section">
           <p className="settings-section-title">General</p>
           <div className="settings-row">
-            <span>Launch Kaval at startup</span>
+            <span>Launch Kaaval at startup</span>
             <span className="settings-row-hint">Coming soon</span>
           </div>
           <div className="settings-row">

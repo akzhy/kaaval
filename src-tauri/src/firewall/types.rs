@@ -15,9 +15,9 @@ pub const SUBLAYER_KEY: GUID =
 pub const RULE_NAMESPACE: Uuid =
     Uuid::from_u128(0x96c7cb12f1889e8b1a4ae8b76b46e1fd);
 
-pub const PROVIDER_NAME: &str = "Kaval Firewall";
-pub const PROVIDER_DESCRIPTION: &str = "Rules managed by Kaval Firewall.";
-pub const RULE_DESCRIPTION: &str = "Managed by Kaval Firewall backend.";
+pub const PROVIDER_NAME: &str = "Kaaval Firewall";
+pub const PROVIDER_DESCRIPTION: &str = "Rules managed by Kaaval Firewall.";
+pub const RULE_DESCRIPTION: &str = "Managed by Kaaval Firewall backend.";
 
 #[derive(Debug, Clone, Copy)]
 pub struct FilterSpec {

@@ -104,7 +104,7 @@ pub fn add_block_filters(engine: &EngineHandle, exe_path: &str, app_id: &AppIdBl
     for spec in FILTER_SPECS {
         let filter_key = deterministic_filter_key(exe_path, spec);
         let display_name = format!(
-            "Kaval block {} {}: {}",
+            "Kaaval block {} {}: {}",
             spec.protocol_name, spec.ip_version, exe_path
         );
         let description = format!(
@@ -443,7 +443,7 @@ pub fn add_tagged_app_filters(
     for spec in FILTER_SPECS {
         let filter_key = tagged_filter_key(tag, exe_path, spec);
         let display_name = format!(
-            "Kaval {tag} {} {}: {}",
+            "Kaaval {tag} {} {}: {}",
             spec.protocol_name, spec.ip_version, exe_path
         );
         let description = format!("{RULE_DESCRIPTION} {} {} ({tag})", spec.protocol_name, spec.ip_version);
@@ -534,7 +534,7 @@ pub fn add_tagged_blanket_filters(
 ) -> Result<()> {
     for spec in FILTER_SPECS {
         let filter_key = tagged_blanket_filter_key(tag, spec);
-        let display_name = format!("Kaval {tag} {} {}", spec.protocol_name, spec.ip_version);
+        let display_name = format!("Kaaval {tag} {} {}", spec.protocol_name, spec.ip_version);
         let description = format!("{RULE_DESCRIPTION} {} {} ({tag})", spec.protocol_name, spec.ip_version);
 
         let mut display_name_w = to_wide_null(&display_name);

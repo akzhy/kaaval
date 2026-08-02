@@ -13,7 +13,7 @@ function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="brand">
-        <p className="brand-name">Kaval</p>
+        <p className="brand-name">Kaaval</p>
         <p className="brand-tag">Enterprise Firewall</p>
       </div>
 

@@ -6,7 +6,7 @@
 
 use std::io::{self, Write};
 
-use netblocker_lib::firewall::FirewallManager;
+use kaaval_lib::firewall::FirewallManager;
 
 fn main() {
     println!("Kaaval Firewall - Reset Tool");

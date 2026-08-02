@@ -1,7 +1,7 @@
 import { defineConfig } from "@flairjs/client";
 
 const theme = defineConfig({
-  prefix: "kaval",
+  prefix: "kaaval",
   selector: "body",
   tokens: {
     colors: {
