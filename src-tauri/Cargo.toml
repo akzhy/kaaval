@@ -4,6 +4,9 @@ version = "0.1.0"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
+# Tauri's dev/build commands run `cargo run`/`cargo build` without `--bin`;
+# pin the default so the kaval-reset CLI binary doesn't make that ambiguous.
+default-run = "netblocker"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

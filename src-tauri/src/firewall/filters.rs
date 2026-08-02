@@ -16,6 +16,10 @@ use windows::Win32::NetworkManagement::WindowsFilteringPlatform::{
 
 const FWP_E_FILTER_NOT_FOUND: u32 = 0x8032_0003;
 const FWP_E_NOT_FOUND: u32 = 0x8032_0001;
+/// Returned by `FwpmFilterCreateEnumHandle0` when the enum template's provider
+/// key has never had any filters (e.g. our provider was never created yet).
+/// This is a normal "nothing to enumerate" state, not a real failure.
+const FWP_E_NEVER_MATCH: u32 = 0x8032_0033;
 
 use super::app_id::AppIdBlob;
 use super::engine::EngineHandle;
@@ -253,7 +257,13 @@ fn enum_provider_filter_records(engine: &EngineHandle) -> Result<Vec<FilterRecor
         providerKey: &mut provider_key,
         ..Default::default()
     };
-    let enum_handle = EnumHandle::new(engine, &template)?;
+    let enum_handle = match EnumHandle::new(engine, &template) {
+        Ok(handle) => handle,
+        Err(FirewallError::WindowsApi { code, .. }) if code == FWP_E_NEVER_MATCH => {
+            return Ok(Vec::new());
+        }
+        Err(err) => return Err(err),
+    };
 
     let mut out_filters: *mut *mut FWPM_FILTER0 = null_mut();
     let mut count = 0u32;
