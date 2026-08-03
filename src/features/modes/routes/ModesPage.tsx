@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useSearch } from "@tanstack/react-router";
 import { css } from "@flairjs/client";
 import { open } from "@tauri-apps/plugin-dialog";
 import Card from "@/components/Card";
@@ -16,7 +17,12 @@ import {
   type ImportDecision,
 } from "../utils/modesTransfer";
 
+type ModesPageSearch = {
+  modeId?: string;
+};
+
 function ModesPage() {
+  const search = useSearch({ strict: false }) as ModesPageSearch | undefined;
   const modes = useModesStore((state) => state.modes);
   const error = useModesStore((state) => state.error);
   const refresh = useModesStore((state) => state.refresh);
@@ -42,6 +48,16 @@ function ModesPage() {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    const modeId = typeof search?.modeId === "string" ? search.modeId : null;
+    if (modeId) {
+      const matchingMode = modes.find((mode) => mode.id === modeId);
+      if (matchingMode) {
+        setEditingMode(matchingMode);
+      }
+    }
+  }, [modes, search]);
 
   function openCreate() {
     refresh();
@@ -423,6 +439,10 @@ function ModesPage() {
                       : "mode-status"
                   }
                 >
+                  <span
+                    className={mode.active ? "mode-active-dot" : "mode-active-dot mode-active-dot-inactive"}
+                    aria-label={mode.active ? "Active mode" : "Inactive mode"}
+                  />
                   {mode.active ? "Active" : "Inactive"}
                 </span>
               </div>
@@ -698,6 +718,20 @@ ModesPage.flair = css`
     font-size: 0.8rem;
   }
 
+  .mode-active-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background-color: #2ecc71;
+    box-shadow: 0 0 0 2px color-mix(in srgb, #2ecc71 20%, transparent);
+    flex-shrink: 0;
+  }
+
+  .mode-active-dot-inactive {
+    background-color: $colors.text-muted;
+    box-shadow: none;
+  }
+
   .mode-card-name {
     margin: 0;
     font-weight: 600;
@@ -708,6 +742,9 @@ ModesPage.flair = css`
   }
 
   .mode-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     font-size: 0.68rem;
     text-transform: uppercase;
     letter-spacing: 0.03em;
