@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { css } from "@flairjs/client";
 import { useState } from "react";
 import clsx from "clsx";
@@ -20,6 +20,9 @@ const NAV_ITEMS = [
 
 function Sidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const currentPath = useRouterState({
+    select: (state) => state.location.pathname,
+  });
 
   return (
     <aside className={clsx("sidebar", { "sidebar-collapsed": isCollapsed })}>
@@ -38,23 +41,27 @@ function Sidebar() {
       </div>
 
       <nav className="nav">
-        {NAV_ITEMS.map(({ to, label, Icon }) => (
-          <Link
-            key={to}
-            to={to}
-            className={clsx("nav-link", { "nav-link-collapsed": isCollapsed })}
-            activeOptions={{ exact: to === "/" }}
-            activeProps={{
-              className: clsx("nav-link", "nav-link-active", {
+        {NAV_ITEMS.map(({ to, label, Icon }) => {
+          const isActive =
+            to === "/"
+              ? currentPath === "/"
+              : currentPath === to || currentPath.startsWith(`${to}/`);
+
+          return (
+            <Link
+              key={to}
+              to={to}
+              className={clsx("nav-link", {
+                "nav-link-active": isActive,
                 "nav-link-collapsed": isCollapsed,
-              }),
-            }}
-            title={label}
-          >
-            <Icon className="nav-icon" size={18} />
-            {!isCollapsed && <span>{label}</span>}
-          </Link>
-        ))}
+              })}
+              title={label}
+            >
+              <Icon className="nav-icon" size={18} />
+              {!isCollapsed && <span>{label}</span>}
+            </Link>
+          );
+        })}
       </nav>
     </aside>
   );
@@ -159,6 +166,10 @@ Sidebar.flair = css`
   .nav-link-active {
     background-color: $colors.primary;
     color: white;
+  }
+
+  .nav-link-active:hover {
+    background-color: color-mix(in srgb, $colors.primary, black 20%);
   }
 
   .nav-icon {
