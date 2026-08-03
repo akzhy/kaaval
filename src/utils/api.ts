@@ -55,3 +55,7 @@ export function pickExecutablePath(): Promise<string | null> {
 export function pickIconDataUrl(): Promise<string | null> {
   return invoke<string | null>("pick_icon_data_url");
 }
+
+export function exportModesFile(content: string, destination: string): Promise<void> {
+  return invoke("export_modes_file", { content, destination });
+}

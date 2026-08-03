@@ -336,6 +336,20 @@ fn pick_icon_data_url(app: tauri::AppHandle) -> Option<String> {
     Some(format!("data:{mime};base64,{encoded}"))
 }
 
+#[tauri::command]
+fn export_modes_file(content: String, destination: String) -> Result<(), String> {
+    let path = std::path::Path::new(&destination);
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            std::fs::create_dir_all(parent)
+                .map_err(|err| format!("failed to create parent directory: {err}"))?;
+        }
+    }
+    std::fs::write(path, content)
+        .map_err(|err| format!("failed to write export file: {err}"))?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     static TRACING_INIT: Once = Once::new();
@@ -370,7 +384,8 @@ pub fn run() {
             delete_mode,
             set_mode_active,
             pick_executable_path,
-            pick_icon_data_url
+            pick_icon_data_url,
+            export_modes_file
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
