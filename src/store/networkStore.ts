@@ -7,6 +7,8 @@ import {
   relaunchAsAdmin,
   unblockApplication,
 } from "@/utils/api";
+import { isAdminRequiredError } from "@/utils/admin";
+import { ADMIN_REQUIRED_MESSAGE } from "@/utils/constants";
 import { normalizePathKey } from "@/utils/format";
 import type {
   ApplicationGroup,
@@ -29,13 +31,6 @@ type NetworkStore = {
   refresh: () => Promise<void>;
   toggleBlock: (group: ApplicationGroup) => Promise<void>;
 };
-
-const ADMIN_REQUIRED_PREFIX = "ADMIN_REQUIRED:";
-
-function isAdminRequiredError(value: unknown): boolean {
-  const text = value instanceof Error ? value.message : String(value);
-  return text.startsWith(ADMIN_REQUIRED_PREFIX);
-}
 
 export const useNetworkStore = create<NetworkStore>((set, get) => ({
   requests: [],
@@ -151,8 +146,7 @@ export const useNetworkStore = create<NetworkStore>((set, get) => ({
             ...state.blockedOverrides,
             [pathKey]: group.blocked,
           },
-          error:
-            "Administrator privileges are required. Relaunch as Administrator to continue.",
+          error: ADMIN_REQUIRED_MESSAGE,
         }));
         return;
       }

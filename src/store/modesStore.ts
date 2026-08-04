@@ -11,6 +11,8 @@ import {
   updateMode,
   type ModeInput,
 } from "@/utils/api";
+import { isAdminRequiredError } from "@/utils/admin";
+import { ADMIN_REQUIRED_MESSAGE } from "@/utils/constants";
 import type { KnownApp, Mode } from "@/utils/types";
 
 type ModesStore = {
@@ -26,13 +28,6 @@ type ModesStore = {
   pickIcon: () => Promise<string | null>;
   pickExecutable: () => Promise<string | null>;
 };
-
-const ADMIN_REQUIRED_PREFIX = "ADMIN_REQUIRED:";
-
-function isAdminRequiredError(value: unknown): boolean {
-  const text = value instanceof Error ? value.message : String(value);
-  return text.startsWith(ADMIN_REQUIRED_PREFIX);
-}
 
 export const useModesStore = create<ModesStore>((set, get) => ({
   modes: [],
@@ -110,8 +105,7 @@ export const useModesStore = create<ModesStore>((set, get) => ({
         }
 
         set({
-          error:
-            "Administrator privileges are required. Relaunch as Administrator to continue.",
+          error: ADMIN_REQUIRED_MESSAGE,
         });
         return;
       }
