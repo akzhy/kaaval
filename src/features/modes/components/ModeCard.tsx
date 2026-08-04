@@ -74,14 +74,16 @@ function ModeCard({
           >
             Edit
           </button>
-          <button
-            type="button"
-            className="mode-action-btn"
-            onClick={() => onDelete?.()}
-            disabled={!onDelete}
-          >
-            Delete
-          </button>
+          {onDelete && (
+            <button
+              type="button"
+              className="mode-action-btn"
+              onClick={() => onDelete?.()}
+              disabled={!onDelete}
+            >
+              Delete
+            </button>
+          )}
         </div>
       </div>
     </Card>
