@@ -75,7 +75,7 @@ function TopBar({ secure, isAdmin, throughputMbps }: TopBarProps) {
         <button
           type="button"
           className="window-control"
-          onClick={() => void onMinimize()}
+          onClick={() => onMinimize()}
           aria-label="Minimize window"
           title="Minimize"
         >
@@ -84,7 +84,7 @@ function TopBar({ secure, isAdmin, throughputMbps }: TopBarProps) {
         <button
           type="button"
           className="window-control"
-          onClick={() => void onToggleMaximize()}
+          onClick={() => onToggleMaximize()}
           aria-label={isMaximized ? "Restore window" : "Maximize window"}
           title={isMaximized ? "Restore" : "Maximize"}
         >
@@ -93,7 +93,7 @@ function TopBar({ secure, isAdmin, throughputMbps }: TopBarProps) {
         <button
           type="button"
           className="window-control window-control-close"
-          onClick={() => void onClose()}
+          onClick={() => onClose()}
           aria-label="Close window"
           title="Close"
         >

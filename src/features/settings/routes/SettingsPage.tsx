@@ -106,7 +106,7 @@ function SettingsPage() {
               className="settings-select"
               value={themePreference}
               onChange={(event) => {
-                void onThemePreferenceChange(
+                onThemePreferenceChange(
                   event.target.value as ThemePreference,
                 );
               }}
