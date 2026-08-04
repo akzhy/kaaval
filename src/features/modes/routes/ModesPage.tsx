@@ -7,11 +7,11 @@ import Modal from "@/components/Modal";
 import { useModesStore } from "@/store/modesStore";
 import { exportModesFile } from "@/utils/api";
 import type { Mode } from "@/utils/types";
+import ModeCard from "../components/ModeCard";
 import ModeForm from "../components/ModeForm";
 import {
   buildImportedName,
   createExportPayload,
-  modeTypeLabel,
   validateImportedModes,
   type ImportedMode,
   type ImportDecision,
@@ -440,88 +440,13 @@ function ModesPage() {
 
       <div className="modes-page-grid">
         {modes.map((mode) => (
-          <Card key={mode.id}>
-            <div className="mode-card">
-              <div className="mode-card-head">
-                <div className="mode-card-heading">
-                  {mode.icon_data_url ? (
-                    <img
-                      src={mode.icon_data_url}
-                      alt=""
-                      className="mode-card-icon"
-                    />
-                  ) : (
-                    <span className="mode-card-icon mode-card-icon-fallback">
-                      {mode.name.charAt(0).toUpperCase()}
-                    </span>
-                  )}
-                  <p className="mode-card-name">{mode.name}</p>
-                </div>
-                <span
-                  className={
-                    mode.active
-                      ? "mode-status mode-status-active"
-                      : "mode-status"
-                  }
-                >
-                  <span
-                    className={
-                      mode.active
-                        ? "mode-active-dot"
-                        : "mode-active-dot mode-active-dot-inactive"
-                    }
-                    aria-label={mode.active ? "Active mode" : "Inactive mode"}
-                  />
-                  {mode.active ? "Active" : "Inactive"}
-                </span>
-              </div>
-
-              <p className="mode-card-label">{modeTypeLabel(mode)}</p>
-              <div className="mode-card-chips">
-                {mode.matchers.slice(0, 6).map((matcher) => (
-                  <span
-                    key={`${matcher.kind}:${matcher.value}`}
-                    className="mode-chip"
-                  >
-                    {matcher.value}
-                  </span>
-                ))}
-                {mode.matchers.length > 6 ? (
-                  <span className="mode-chip">
-                    +{mode.matchers.length - 6} more
-                  </span>
-                ) : null}
-              </div>
-
-              <div className="mode-card-actions">
-                <button
-                  type="button"
-                  className={
-                    mode.active
-                      ? "mode-action-btn mode-action-btn-danger"
-                      : "mode-action-btn mode-action-btn-primary"
-                  }
-                  onClick={() => setActive(mode.id, !mode.active)}
-                >
-                  {mode.active ? "Deactivate" : "Activate"}
-                </button>
-                <button
-                  type="button"
-                  className="mode-action-btn"
-                  onClick={() => setEditingMode(mode)}
-                >
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  className="mode-action-btn"
-                  onClick={() => deleteModeAction(mode.id)}
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          </Card>
+          <ModeCard
+            key={mode.id}
+            mode={mode}
+            onToggleActive={(checked) => setActive(mode.id, checked)}
+            onEdit={() => setEditingMode(mode)}
+            onDelete={() => deleteModeAction(mode.id)}
+          />
         ))}
 
         <Card dashed>
@@ -702,141 +627,6 @@ ModesPage.flair = css`
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
     gap: 14px;
-  }
-
-  .mode-card {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    height: 100%;
-  }
-
-  .mode-card-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-  }
-
-  .mode-card-heading {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
-  }
-
-  .mode-card-icon {
-    width: 26px;
-    height: 26px;
-    border-radius: $radii.card;
-    object-fit: cover;
-    flex-shrink: 0;
-  }
-
-  .mode-card-icon-fallback {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background-color: $colors.surface;
-    border: 1px solid $colors.border;
-    color: $colors.text-muted;
-    font-weight: 700;
-    font-size: 0.8rem;
-  }
-
-  .mode-active-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 999px;
-    background-color: #2ecc71;
-    box-shadow: 0 0 0 2px color-mix(in srgb, #2ecc71 20%, transparent);
-    flex-shrink: 0;
-  }
-
-  .mode-active-dot-inactive {
-    background-color: $colors.text-muted;
-    box-shadow: none;
-  }
-
-  .mode-card-name {
-    margin: 0;
-    font-weight: 600;
-    color: $colors.text;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .mode-status {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 0.68rem;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: $colors.text-muted;
-    white-space: nowrap;
-  }
-
-  .mode-status-active {
-    color: $colors.primary;
-    font-weight: 700;
-  }
-
-  .mode-card-label {
-    margin: 0;
-    font-size: 0.75rem;
-    color: $colors.text-muted;
-  }
-
-  .mode-card-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-
-  .mode-chip {
-    font-size: 0.72rem;
-    background-color: $colors.surface;
-    border: 1px solid $colors.border;
-    border-radius: $radii.card;
-    padding: 3px 8px;
-    color: $colors.text;
-    max-width: 160px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .mode-card-actions {
-    margin-top: auto;
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-
-  .mode-action-btn {
-    flex: 1 1 74px;
-    background-color: $colors.surface;
-    border: 1px solid $colors.border;
-    border-radius: $radii.card;
-    padding: 6px 8px;
-    color: $colors.text;
-    font-size: 0.76rem;
-    cursor: pointer;
-  }
-
-  .mode-action-btn-primary {
-    background-color: $colors.primary;
-    border-color: $colors.primary;
-    color: white;
-    font-weight: 600;
-  }
-
-  .mode-action-btn-danger {
-    background-color: transparent;
-    border-color: $colors.negative;
-    color: $colors.negative;
   }
 
   .mode-create {

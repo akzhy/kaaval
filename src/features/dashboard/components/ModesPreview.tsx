@@ -1,8 +1,8 @@
 import { useEffect } from "react";
 import { Link, useRouter } from "@tanstack/react-router";
 import { css } from "@flairjs/client";
-import { Pencil } from "lucide-react";
 import Card from "@/components/Card";
+import ModeCard from "@/features/modes/components/ModeCard";
 import { useModesStore } from "@/store/modesStore";
 
 function ModesPreview() {
@@ -27,86 +27,27 @@ function ModesPreview() {
           View All Modes ›
         </Link>
       </div>
-
+      {preview.length === 0 && (
+        <p className="modes-preview-empty">
+          No modes yet. Create one by clicking the "Create New Mode" button below.
+        </p>
+      )}
       <div className="modes-preview-grid">
-        {preview.length === 0 ? (
-          <p className="modes-preview-empty">
-            No modes yet. Create one from the Modes page.
-          </p>
-        ) : (
-          preview.map((mode) => (
-            <Card key={mode.id}>
-              <div className="mode-card">
-                <div className="mode-card-head">
-                  <div className="mode-card-heading">
-                    <p className="mode-card-name">{mode.name}</p>
-                  </div>
-                  <div className="mode-card-head-actions">
-                    <button
-                      type="button"
-                      className="mode-preview-edit-btn"
-                      onClick={() => {
-                        router.navigate({
-                          to: "/modes",
-                          search: { modeId: mode.id },
-                        });
-                      }}
-                      aria-label={`Edit ${mode.name}`}
-                    >
-                      <Pencil size={14} />
-                    </button>
-                    <span
-                      className={
-                        mode.active
-                          ? "mode-status mode-status-active"
-                          : "mode-status"
-                      }
-                    >
-                      <span
-                        className={
-                          mode.active
-                            ? "mode-active-dot"
-                            : "mode-active-dot mode-active-dot-inactive"
-                        }
-                        aria-label={
-                          mode.active ? "Active mode" : "Inactive mode"
-                        }
-                      />
-                      {mode.active ? "Active" : "Inactive"}
-                    </span>
-                  </div>
-                </div>
-                <p className="mode-card-label">
-                  {mode.mode_type === "block_all_except"
-                    ? "Block all except:"
-                    : "Blocked applications:"}
-                </p>
-                <div className="mode-card-chips">
-                  {mode.matchers.slice(0, 4).map((matcher) => (
-                    <span
-                      key={`${matcher.kind}:${matcher.value}`}
-                      className="mode-chip"
-                    >
-                      {matcher.value}
-                    </span>
-                  ))}
-                  {mode.matchers.length > 4 ? (
-                    <span className="mode-chip mode-chip-ellipsis">…</span>
-                  ) : null}
-                </div>
-                <div className="mode-card-footer">
-                  <button
-                    type="button"
-                    className="modes-preview-toggle"
-                    onClick={() => setActive(mode.id, !mode.active)}
-                  >
-                    {mode.active ? "Deactivate" : "Activate"}
-                  </button>
-                </div>
-              </div>
-            </Card>
-          ))
-        )}
+        {preview.map((mode) => (
+          <ModeCard
+            key={mode.id}
+            mode={mode}
+            showIcon={false}
+            matcherLimit={4}
+            onToggleActive={(checked) => setActive(mode.id, checked)}
+            onEdit={() => {
+              router.navigate({
+                to: "/modes",
+                search: { modeId: mode.id },
+              });
+            }}
+          />
+        ))}
 
         <Card dashed>
           <Link to="/modes" className="mode-create">
@@ -158,119 +99,6 @@ ModesPreview.flair = css`
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 12px;
-  }
-
-  .mode-card {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    height: 100%;
-  }
-
-  .mode-card-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-  }
-
-  .mode-card-heading {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
-  }
-
-  .mode-card-name {
-    margin: 0;
-    font-weight: 600;
-    color: $colors.text;
-  }
-
-  .mode-card-head-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .mode-active-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 999px;
-    background-color: #2ecc71;
-    box-shadow: 0 0 0 2px color-mix(in srgb, #2ecc71 20%, transparent);
-    flex-shrink: 0;
-  }
-
-  .mode-active-dot-inactive {
-    background-color: $colors.text-muted;
-    box-shadow: none;
-  }
-
-  .mode-preview-edit-btn {
-    border: none;
-    background: transparent;
-    color: $colors.primary;
-    cursor: pointer;
-    padding: 0;
-    font-size: 0.8rem;
-  }
-
-  .mode-status {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 0.68rem;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: $colors.text-muted;
-  }
-
-  .mode-status-active {
-    color: $colors.primary;
-    font-weight: 700;
-  }
-
-  .mode-card-label {
-    margin: 0;
-    font-size: 0.75rem;
-    color: $colors.text-muted;
-  }
-
-  .mode-card-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-
-  .mode-chip {
-    font-size: 0.72rem;
-    background-color: $colors.surface;
-    border: 1px solid $colors.border;
-    border-radius: $radii.card;
-    padding: 3px 8px;
-    color: $colors.text;
-  }
-
-  .mode-chip-ellipsis {
-    font-weight: 700;
-  }
-
-  .mode-card-footer {
-    margin-top: auto;
-    font-size: 0.75rem;
-    color: $colors.text-muted;
-  }
-
-  .modes-preview-toggle {
-    background: none;
-    border: 1px solid $colors.border;
-    border-radius: $radii.card;
-    padding: 4px 10px;
-    color: $colors.primary;
-    font-size: 0.74rem;
-    font-weight: 600;
-    cursor: pointer;
   }
 
   .mode-create {
