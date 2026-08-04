@@ -2,6 +2,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { css } from "@flairjs/client";
 import { useState } from "react";
 import clsx from "clsx";
+import logo from "@/assets/logo_64x64.png";
 import {
   ChartNoAxesCombined,
   ChevronLeft,
@@ -27,17 +28,8 @@ function Sidebar() {
   return (
     <aside className={clsx("sidebar", { "sidebar-collapsed": isCollapsed })}>
       <div className="brand">
-        <p className="brand-name">{isCollapsed ? "K" : "Kaaval"}</p>
-        <button
-          type="button"
-          className={clsx("collapse-btn", {
-            "collapse-btn-collapsed": isCollapsed,
-          })}
-          onClick={() => setIsCollapsed((prev) => !prev)}
-          aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-        </button>
+        <img src={logo} alt="Kaaval logo" className="brand-logo" />
+        {!isCollapsed && <p className="brand-name">Kaaval</p>}
       </div>
 
       <nav className="nav">
@@ -63,6 +55,17 @@ function Sidebar() {
           );
         })}
       </nav>
+
+      <button
+        type="button"
+        className={clsx("collapse-btn", {
+          "collapse-btn-collapsed": isCollapsed,
+        })}
+        onClick={() => setIsCollapsed((prev) => !prev)}
+        aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+      >
+        {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+      </button>
     </aside>
   );
 }
@@ -106,11 +109,19 @@ Sidebar.flair = css`
     color: $colors.primary;
   }
 
+  .brand-logo {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+    flex-shrink: 0;
+  }
+
   .collapse-btn {
     width: 28px;
     height: 28px;
     position: absolute;
-    right: -14px;
+    right: 0px;
+    bottom: 10px;
     border: none;
     border-radius: $radii.card;
     background: transparent;
@@ -118,16 +129,10 @@ Sidebar.flair = css`
     display: grid;
     place-items: center;
     cursor: pointer;
-    transform: translate(0, 0);
     transition:
       background-color 0.2s ease,
       color 0.2s ease,
       transform 0.2s ease;
-  }
-
-  .collapse-btn-collapsed {
-    right: 0px;
-    transform: translate(50%, 0);
   }
 
   .collapse-btn:hover {
