@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
-import { useSearch } from "@tanstack/react-router";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import { css } from "@flairjs/client";
 import { open } from "@tauri-apps/plugin-dialog";
 import Card from "@/components/Card";
@@ -23,6 +23,7 @@ type ModesPageSearch = {
 
 function ModesPage() {
   const search = useSearch({ strict: false }) as ModesPageSearch | undefined;
+  const navigate = useNavigate({ from: "/modes" });
   const modes = useModesStore((state) => state.modes);
   const error = useModesStore((state) => state.error);
   const refresh = useModesStore((state) => state.refresh);
@@ -37,7 +38,9 @@ function ModesPage() {
   const [importing, setImporting] = useState(false);
   const [notice, setNotice] = useState("");
   const [exportSelectionOpen, setExportSelectionOpen] = useState(false);
-  const [selectedForExport, setSelectedForExport] = useState<Record<string, boolean>>({});
+  const [selectedForExport, setSelectedForExport] = useState<
+    Record<string, boolean>
+  >({});
   const [pendingConflict, setPendingConflict] = useState<{
     modeName: string;
     existingName: string;
@@ -49,19 +52,33 @@ function ModesPage() {
     refresh();
   }, [refresh]);
 
+  function clearModeIdFromSearch() {
+    navigate({
+      search: (prev) => ({ ...prev, modeId: undefined }),
+      replace: true,
+    });
+  }
+
+  function closeEditor() {
+    setEditingMode(undefined);
+    clearModeIdFromSearch();
+  }
+
   useEffect(() => {
     const modeId = typeof search?.modeId === "string" ? search.modeId : null;
     if (modeId) {
       const matchingMode = modes.find((mode) => mode.id === modeId);
       if (matchingMode) {
         setEditingMode(matchingMode);
+        clearModeIdFromSearch();
       }
     }
-  }, [modes, search]);
+  }, [modes, search?.modeId]);
 
   function openCreate() {
     refresh();
     setEditingMode(null);
+    clearModeIdFromSearch();
   }
 
   function openExportPicker() {
@@ -120,7 +137,9 @@ function ModesPage() {
       setExportSelectionOpen(false);
     } catch (error) {
       setNotice(
-        error instanceof Error ? `Export failed: ${error.message}` : "Export failed.",
+        error instanceof Error
+          ? `Export failed: ${error.message}`
+          : "Export failed.",
       );
     }
   }
@@ -146,9 +165,7 @@ function ModesPage() {
     }
   }
 
-  async function handleImportFile(
-    event: ChangeEvent<HTMLInputElement>,
-  ) {
+  async function handleImportFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) {
@@ -240,7 +257,9 @@ function ModesPage() {
           }
           const updated = await updateModeAction(step.targetId, input);
           if (!updated) {
-            throw new Error(`Failed replacing mode '${step.importedMode.name}'.`);
+            throw new Error(
+              `Failed replacing mode '${step.importedMode.name}'.`,
+            );
           }
           replaced += 1;
 
@@ -268,7 +287,9 @@ function ModesPage() {
         `Import complete: ${created} created, ${replaced} replaced, ${skipped} skipped${activated > 0 ? `, ${activated} active state updates` : ""}.`,
       );
     } catch (e) {
-      setNotice(e instanceof Error ? `Import failed: ${e.message}` : "Import failed.");
+      setNotice(
+        e instanceof Error ? `Import failed: ${e.message}` : "Import failed.",
+      );
     } finally {
       setImporting(false);
     }
@@ -311,7 +332,7 @@ function ModesPage() {
             type="file"
             accept="application/json,.json"
             className="modes-page-file-input"
-            onChange={(event) => void handleImportFile(event)}
+            onChange={(event) => handleImportFile(event)}
           />
         </div>
       </div>
@@ -320,7 +341,10 @@ function ModesPage() {
       {notice ? <div className="modes-page-notice">{notice}</div> : null}
 
       {exportSelectionOpen ? (
-        <Modal title="Export modes" onClose={() => setExportSelectionOpen(false)}>
+        <Modal
+          title="Export modes"
+          onClose={() => setExportSelectionOpen(false)}
+        >
           <div className="mode-export-picker">
             <p className="mode-export-picker-title">
               Choose which modes to include in the export.
@@ -374,7 +398,8 @@ function ModesPage() {
         >
           <div className="mode-import-conflict">
             <p className="mode-import-conflict-title">
-              {pendingConflict.modeName} already exists as {pendingConflict.existingName}.
+              {pendingConflict.modeName} already exists as{" "}
+              {pendingConflict.existingName}.
             </p>
             <p className="mode-import-conflict-hint">
               Choose how to handle this imported mode.
@@ -440,7 +465,11 @@ function ModesPage() {
                   }
                 >
                   <span
-                    className={mode.active ? "mode-active-dot" : "mode-active-dot mode-active-dot-inactive"}
+                    className={
+                      mode.active
+                        ? "mode-active-dot"
+                        : "mode-active-dot mode-active-dot-inactive"
+                    }
                     aria-label={mode.active ? "Active mode" : "Inactive mode"}
                   />
                   {mode.active ? "Active" : "Inactive"}
@@ -472,7 +501,7 @@ function ModesPage() {
                       ? "mode-action-btn mode-action-btn-danger"
                       : "mode-action-btn mode-action-btn-primary"
                   }
-                  onClick={() => void setActive(mode.id, !mode.active)}
+                  onClick={() => setActive(mode.id, !mode.active)}
                 >
                   {mode.active ? "Deactivate" : "Activate"}
                 </button>
@@ -486,7 +515,7 @@ function ModesPage() {
                 <button
                   type="button"
                   className="mode-action-btn"
-                  onClick={() => void deleteModeAction(mode.id)}
+                  onClick={() => deleteModeAction(mode.id)}
                 >
                   Delete
                 </button>
@@ -509,12 +538,9 @@ function ModesPage() {
       {editingMode !== undefined ? (
         <Modal
           title={editingMode ? "Edit Mode" : "Create New Mode"}
-          onClose={() => setEditingMode(undefined)}
+          onClose={closeEditor}
         >
-          <ModeForm
-            initialMode={editingMode}
-            onClose={() => setEditingMode(undefined)}
-          />
+          <ModeForm initialMode={editingMode} onClose={closeEditor} />
         </Modal>
       ) : null}
     </div>
