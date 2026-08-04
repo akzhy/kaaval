@@ -1,5 +1,6 @@
 import type { PropsWithChildren } from "react";
 import { css } from "@flairjs/client";
+import * as Dialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 
 type ModalProps = PropsWithChildren<{
@@ -9,22 +10,28 @@ type ModalProps = PropsWithChildren<{
 
 function Modal({ title, onClose, children }: ModalProps) {
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head">
-          <p className="modal-title">{title}</p>
-          <button
-            type="button"
-            className="modal-close"
-            onClick={onClose}
-            aria-label="Close"
-          >
-            <X />
-          </button>
-        </div>
-        <div className="modal-body">{children}</div>
-      </div>
-    </div>
+    <Dialog.Root open onOpenChange={(open) => !open && onClose()}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="modal-overlay" />
+        <Dialog.Content className="modal-panel">
+          <div className="modal-content">
+            <div className="modal-head">
+              <Dialog.Title className="modal-title">{title}</Dialog.Title>
+              <Dialog.Close asChild>
+                <button
+                  type="button"
+                  className="modal-close"
+                  aria-label="Close"
+                >
+                  <X />
+                </button>
+              </Dialog.Close>
+            </div>
+            <div className="modal-body">{children}</div>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
 
@@ -41,6 +48,18 @@ Modal.flair = css`
   }
 
   .modal-panel {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .modal-content {
     background-color: $colors.surface-bright;
     border: 1px solid $colors.border;
     border-radius: $radii.card;
