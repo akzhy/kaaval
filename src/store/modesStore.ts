@@ -42,10 +42,16 @@ export const useModesStore = create<ModesStore>((set, get) => ({
 
   async refresh() {
     try {
-      const [modes, knownApps] = await Promise.all([listModes(), listKnownApps()]);
+      const [modes, knownApps] = await Promise.all([
+        listModes(),
+        listKnownApps(),
+      ]);
       set({ modes, knownApps, loading: false, error: "" });
     } catch (e) {
-      set({ error: e instanceof Error ? e.message : String(e), loading: false });
+      set({
+        error: e instanceof Error ? e.message : String(e),
+        loading: false,
+      });
     }
   },
 

@@ -68,7 +68,9 @@ function ModesPreview() {
                             ? "mode-active-dot"
                             : "mode-active-dot mode-active-dot-inactive"
                         }
-                        aria-label={mode.active ? "Active mode" : "Inactive mode"}
+                        aria-label={
+                          mode.active ? "Active mode" : "Inactive mode"
+                        }
                       />
                       {mode.active ? "Active" : "Inactive"}
                     </span>
@@ -96,7 +98,7 @@ function ModesPreview() {
                   <button
                     type="button"
                     className="modes-preview-toggle"
-                    onClick={() => void setActive(mode.id, !mode.active)}
+                    onClick={() => setActive(mode.id, !mode.active)}
                   >
                     {mode.active ? "Deactivate" : "Activate"}
                   </button>

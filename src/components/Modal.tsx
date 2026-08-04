@@ -13,7 +13,12 @@ function Modal({ title, onClose, children }: ModalProps) {
       <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <p className="modal-title">{title}</p>
-          <button type="button" className="modal-close" onClick={onClose} aria-label="Close">
+          <button
+            type="button"
+            className="modal-close"
+            onClick={onClose}
+            aria-label="Close"
+          >
             <X />
           </button>
         </div>

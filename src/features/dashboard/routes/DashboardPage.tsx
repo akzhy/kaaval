@@ -39,7 +39,7 @@ function DashboardPage() {
           <button
             type="button"
             className="dashboard-relaunch-btn"
-            onClick={() => void onRelaunchAsAdmin()}
+            onClick={() => onRelaunchAsAdmin()}
             disabled={relaunching}
           >
             {relaunching ? "Relaunching..." : "Relaunch as Administrator"}
@@ -116,7 +116,6 @@ DashboardPage.flair = css`
   .dashboard-throughput {
     min-height: 180px;
   }
-
 `;
 
 export default DashboardPage;

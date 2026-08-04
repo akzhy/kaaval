@@ -106,25 +106,30 @@ export function validateImportedModes(raw: unknown): ImportedMode[] {
       throw new Error(`Mode '${mode.name}' must include at least one matcher.`);
     }
 
-    const matchers: AppMatcher[] = mode.matchers.map((matcher, matcherIndex) => {
-      if (typeof matcher !== "object" || matcher === null) {
-        throw new Error(
-          `Mode '${mode.name}' matcher #${matcherIndex + 1} is invalid.`,
-        );
-      }
-      const typedMatcher = matcher as { kind?: unknown; value?: unknown };
-      if (!isMatcherKind(typedMatcher.kind)) {
-        throw new Error(
-          `Mode '${mode.name}' matcher #${matcherIndex + 1} has an invalid kind.`,
-        );
-      }
-      if (typeof typedMatcher.value !== "string" || !typedMatcher.value.trim()) {
-        throw new Error(
-          `Mode '${mode.name}' matcher #${matcherIndex + 1} has an invalid value.`,
-        );
-      }
-      return { kind: typedMatcher.kind, value: typedMatcher.value };
-    });
+    const matchers: AppMatcher[] = mode.matchers.map(
+      (matcher, matcherIndex) => {
+        if (typeof matcher !== "object" || matcher === null) {
+          throw new Error(
+            `Mode '${mode.name}' matcher #${matcherIndex + 1} is invalid.`,
+          );
+        }
+        const typedMatcher = matcher as { kind?: unknown; value?: unknown };
+        if (!isMatcherKind(typedMatcher.kind)) {
+          throw new Error(
+            `Mode '${mode.name}' matcher #${matcherIndex + 1} has an invalid kind.`,
+          );
+        }
+        if (
+          typeof typedMatcher.value !== "string" ||
+          !typedMatcher.value.trim()
+        ) {
+          throw new Error(
+            `Mode '${mode.name}' matcher #${matcherIndex + 1} has an invalid value.`,
+          );
+        }
+        return { kind: typedMatcher.kind, value: typedMatcher.value };
+      },
+    );
 
     const trimmedName = mode.name.trim();
     const key = trimmedName.toLowerCase();

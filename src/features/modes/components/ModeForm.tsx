@@ -163,7 +163,7 @@ function ModeForm({ initialMode, onClose }: ModeFormProps) {
           <button
             type="button"
             className="mode-form-btn-secondary"
-            onClick={() => void handleChooseIcon()}
+            onClick={() => handleChooseIcon()}
           >
             Choose Icon
           </button>
@@ -237,7 +237,7 @@ function ModeForm({ initialMode, onClose }: ModeFormProps) {
             <button
               type="button"
               className="mode-form-btn-secondary"
-              onClick={() => void handleBrowseExecutable()}
+              onClick={() => handleBrowseExecutable()}
             >
               Browse for executable…
             </button>
@@ -314,7 +314,7 @@ function ModeForm({ initialMode, onClose }: ModeFormProps) {
           type="button"
           className="mode-form-btn-primary"
           disabled={saving}
-          onClick={() => void handleSave()}
+          onClick={() => handleSave()}
         >
           {saving ? "Saving…" : "Save Mode"}
         </button>

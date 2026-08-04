@@ -86,7 +86,7 @@ function ActivityLogPage() {
                   : "action-btn action-btn-block"
               }
               disabled={disabled}
-              onClick={() => void toggleBlock(group)}
+              onClick={() => toggleBlock(group)}
             >
               {busyPath === group.appPath
                 ? "Working…"

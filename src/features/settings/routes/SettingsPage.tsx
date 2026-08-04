@@ -1,10 +1,7 @@
 import { css } from "@flairjs/client";
 import { useEffect, useState } from "react";
 import Card from "@/components/Card";
-import {
-  getAppSettings,
-  setTurnOffModesAndFiltersOnClose,
-} from "@/utils/api";
+import { getAppSettings, setTurnOffModesAndFiltersOnClose } from "@/utils/api";
 
 function SettingsPage() {
   const [turnOffOnClose, setTurnOffOnClose] = useState(false);
@@ -68,14 +65,17 @@ function SettingsPage() {
             <div className="settings-row-copy">
               <span>Turn off modes and filters when app is closed</span>
               <span className="settings-row-hint">
-                Disables active mode and removes all Kaaval firewall blocks on close.
+                Disables active mode and removes all Kaaval firewall blocks on
+                close.
               </span>
             </div>
             <label className="settings-switch">
               <input
                 type="checkbox"
                 checked={turnOffOnClose}
-                onChange={(event) => onToggleTurnOffOnClose(event.target.checked)}
+                onChange={(event) =>
+                  onToggleTurnOffOnClose(event.target.checked)
+                }
                 disabled={loading || saving}
               />
               <span className="settings-switch-track" />

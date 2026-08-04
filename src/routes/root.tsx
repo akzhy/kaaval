@@ -48,7 +48,11 @@ function RootLayout() {
     <div className="app-shell">
       <Sidebar />
       <div className="app-main">
-        <TopBar secure={!error} isAdmin={isAdmin} throughputMbps={throughputMbps} />
+        <TopBar
+          secure={!error}
+          isAdmin={isAdmin}
+          throughputMbps={throughputMbps}
+        />
         <main className="app-content">
           <Outlet />
         </main>

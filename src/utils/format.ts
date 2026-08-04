@@ -1,6 +1,8 @@
 export function normalizePathKey(path: string): string {
   const trimmed = path.trim();
-  const withoutPrefix = trimmed.startsWith("\\\\?\\") ? trimmed.slice(4) : trimmed;
+  const withoutPrefix = trimmed.startsWith("\\\\?\\")
+    ? trimmed.slice(4)
+    : trimmed;
   return withoutPrefix.replace(/\//g, "\\").toLowerCase();
 }
 
@@ -12,5 +14,9 @@ export function formatMbps(value: number): string {
 }
 
 export function formatTime(date: Date): string {
-  return date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  return date.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
 }

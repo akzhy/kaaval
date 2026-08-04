@@ -65,7 +65,10 @@ export function pickIconDataUrl(): Promise<string | null> {
   return invoke<string | null>("pick_icon_data_url");
 }
 
-export function exportModesFile(content: string, destination: string): Promise<void> {
+export function exportModesFile(
+  content: string,
+  destination: string,
+): Promise<void> {
   return invoke("export_modes_file", { content, destination });
 }
 
@@ -73,7 +76,9 @@ export function getAppSettings(): Promise<AppSettings> {
   return invoke<AppSettings>("get_app_settings");
 }
 
-export function setTurnOffModesAndFiltersOnClose(enabled: boolean): Promise<AppSettings> {
+export function setTurnOffModesAndFiltersOnClose(
+  enabled: boolean,
+): Promise<AppSettings> {
   return invoke<AppSettings>("set_turn_off_modes_and_filters_on_close", {
     enabled,
   });
