@@ -1,6 +1,7 @@
 import { css } from "@flairjs/client";
 import { useEffect, useState } from "react";
 import Card from "@/components/Card";
+import Switch from "@/components/Switch";
 import { getAppSettings, setTurnOffModesAndFiltersOnClose } from "@/utils/api";
 
 function SettingsPage() {
@@ -69,17 +70,12 @@ function SettingsPage() {
                 close.
               </span>
             </div>
-            <label className="settings-switch">
-              <input
-                type="checkbox"
-                checked={turnOffOnClose}
-                onChange={(event) =>
-                  onToggleTurnOffOnClose(event.target.checked)
-                }
-                disabled={loading || saving}
-              />
-              <span className="settings-switch-track" />
-            </label>
+            <Switch
+              checked={turnOffOnClose}
+              onCheckedChange={onToggleTurnOffOnClose}
+              disabled={loading || saving}
+              ariaLabel="Turn off modes and filters when app is closed"
+            />
           </div>
           {error ? <p className="settings-error">{error}</p> : null}
         </div>
@@ -151,57 +147,6 @@ SettingsPage.flair = css`
   .settings-row-hint {
     color: $colors.text-muted;
     font-size: 0.78rem;
-  }
-
-  .settings-switch {
-    position: relative;
-    width: 40px;
-    height: 24px;
-    display: inline-flex;
-    align-items: center;
-    flex-shrink: 0;
-    cursor: pointer;
-  }
-
-  .settings-switch input {
-    position: absolute;
-    opacity: 0;
-    width: 0;
-    height: 0;
-  }
-
-  .settings-switch-track {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    border-radius: 999px;
-    background: $colors.border;
-    transition: background-color 0.16s ease;
-  }
-
-  .settings-switch-track::after {
-    content: "";
-    position: absolute;
-    top: 3px;
-    left: 3px;
-    width: 18px;
-    height: 18px;
-    border-radius: 999px;
-    background: #fff;
-    transition: transform 0.16s ease;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
-  }
-
-  .settings-switch input:checked + .settings-switch-track {
-    background: $colors.primary;
-  }
-
-  .settings-switch input:checked + .settings-switch-track::after {
-    transform: translateX(16px);
-  }
-
-  .settings-switch input:disabled + .settings-switch-track {
-    opacity: 0.55;
   }
 
   .settings-error {
