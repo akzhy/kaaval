@@ -2,7 +2,29 @@ import { defineConfig } from "@flairjs/client";
 
 const theme = defineConfig({
   prefix: "kaaval",
-  selector: "body",
+  selector: (content, themeName) => {
+    if (!themeName) {
+      return `body {${content}}`;
+    }
+    return `body[data-theme="${themeName}"] {${content}}`;
+  },
+  themes: {
+    light: {
+      tokens: {
+        colors: {
+          primary: "#0b6acb",
+          surface: "#f4f7fb",
+          "surface-dim": "#edf2f7",
+          "surface-bright": "#ffffff",
+          positive: "#1f8a4c",
+          negative: "#b42318",
+          border: "#d5dbe6",
+          text: "#101828",
+          "text-muted": "#5f6b7a",
+        },
+      },
+    },
+  },
   tokens: {
     colors: {
       primary: "#0078d4",

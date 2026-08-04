@@ -170,6 +170,7 @@ Sidebar.flair = css`
 
   .nav-link-active:hover {
     background-color: color-mix(in srgb, $colors.primary, black 20%);
+    color: white;
   }
 
   .nav-icon {

@@ -28,6 +28,8 @@ export type DashboardStats = {
   blocked_today: number;
 };
 
+export type ThemePreference = "system" | "dark" | "light";
+
 export type MatcherKind = "path" | "directory" | "name";
 
 export type AppMatcher = {
@@ -54,6 +56,7 @@ export type KnownApp = {
 
 export type AppSettings = {
   turn_off_modes_and_filters_on_close: boolean;
+  theme_preference: ThemePreference;
 };
 
 export type AdminStatus = {

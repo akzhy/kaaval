@@ -57,10 +57,26 @@ struct AdminStatus {
     is_admin: bool,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum ThemePreference {
+    System,
+    Dark,
+    Light,
+}
+
+impl Default for ThemePreference {
+    fn default() -> Self {
+        Self::System
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct AppSettings {
     #[serde(default)]
     turn_off_modes_and_filters_on_close: bool,
+    #[serde(default)]
+    theme_preference: ThemePreference,
 }
 
 struct AppSettingsState {
@@ -576,6 +592,20 @@ fn set_turn_off_modes_and_filters_on_close(
     Ok(state.settings.clone())
 }
 
+#[tauri::command]
+fn set_theme_preference(
+    theme_preference: ThemePreference,
+    settings_state: tauri::State<'_, Mutex<AppSettingsState>>,
+) -> Result<AppSettings, String> {
+    let mut state = settings_state
+        .inner()
+        .lock()
+        .map_err(|_| "failed to lock settings state".to_string())?;
+    state.settings.theme_preference = theme_preference;
+    state.save()?;
+    Ok(state.settings.clone())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     static TRACING_INIT: Once = Once::new();
@@ -638,6 +668,7 @@ pub fn run() {
             export_modes_file,
             get_app_settings,
             set_turn_off_modes_and_filters_on_close,
+            set_theme_preference,
             get_admin_status,
             relaunch_as_admin
         ])

@@ -8,6 +8,7 @@ import type {
   Mode,
   ModeType,
   NetworkRequest,
+  ThemePreference,
 } from "./types";
 
 export function listNetworkRequests(): Promise<NetworkRequest[]> {
@@ -82,6 +83,12 @@ export function setTurnOffModesAndFiltersOnClose(
   return invoke<AppSettings>("set_turn_off_modes_and_filters_on_close", {
     enabled,
   });
+}
+
+export function setThemePreference(
+  themePreference: ThemePreference,
+): Promise<AppSettings> {
+  return invoke<AppSettings>("set_theme_preference", { themePreference });
 }
 
 export function getAdminStatus(): Promise<AdminStatus> {
