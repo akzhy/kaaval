@@ -1,8 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Outlet } from "@tanstack/react-router";
 import { css } from "@flairjs/client";
 import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
+import { relaunchAsAdmin } from "@/utils/api";
 import { useNetworkStore } from "@/store/networkStore";
 
 const POLL_INTERVAL_MS = 2000;
@@ -13,6 +14,9 @@ function RootLayout() {
   const throughputMbps = useNetworkStore(
     (state) => state.dashboardStats.throughput_mbps,
   );
+  const isAdmin = useNetworkStore((state) => state.isAdmin);
+  const loading = useNetworkStore((state) => state.loading);
+  const startupPromptedRef = useRef(false);
 
   useEffect(() => {
     refresh();
@@ -22,11 +26,29 @@ function RootLayout() {
     return () => window.clearInterval(timer);
   }, [refresh]);
 
+  useEffect(() => {
+    if (loading || isAdmin || startupPromptedRef.current) {
+      return;
+    }
+
+    startupPromptedRef.current = true;
+    const confirmed = window.confirm(
+      "Kaaval requires Administrator privileges. Relaunch as Administrator now?",
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    relaunchAsAdmin().catch((e) => {
+      console.error("failed to relaunch as administrator", e);
+    });
+  }, [isAdmin, loading]);
+
   return (
     <div className="app-shell">
       <Sidebar />
       <div className="app-main">
-        <TopBar secure={!error} throughputMbps={throughputMbps} />
+        <TopBar secure={!error} isAdmin={isAdmin} throughputMbps={throughputMbps} />
         <main className="app-content">
           <Outlet />
         </main>

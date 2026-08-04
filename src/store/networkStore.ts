@@ -1,8 +1,10 @@
 import { create } from "zustand";
 import {
   blockApplication,
+  getAdminStatus,
   getDashboardStats,
   listNetworkRequests,
+  relaunchAsAdmin,
   unblockApplication,
 } from "@/utils/api";
 import { normalizePathKey } from "@/utils/format";
@@ -23,9 +25,17 @@ type NetworkStore = {
   error: string;
   lastUpdated: string;
   busyPath: string;
+  isAdmin: boolean;
   refresh: () => Promise<void>;
   toggleBlock: (group: ApplicationGroup) => Promise<void>;
 };
+
+const ADMIN_REQUIRED_PREFIX = "ADMIN_REQUIRED:";
+
+function isAdminRequiredError(value: unknown): boolean {
+  const text = value instanceof Error ? value.message : String(value);
+  return text.startsWith(ADMIN_REQUIRED_PREFIX);
+}
 
 export const useNetworkStore = create<NetworkStore>((set, get) => ({
   requests: [],
@@ -36,12 +46,14 @@ export const useNetworkStore = create<NetworkStore>((set, get) => ({
   error: "",
   lastUpdated: "",
   busyPath: "",
+  isAdmin: false,
 
   async refresh() {
     try {
-      const [requests, dashboardStats] = await Promise.all([
+      const [requests, dashboardStats, adminStatus] = await Promise.all([
         listNetworkRequests(),
         getDashboardStats(),
+        getAdminStatus(),
       ]);
 
       set((state) => {
@@ -72,6 +84,7 @@ export const useNetworkStore = create<NetworkStore>((set, get) => ({
           dashboardStats,
           throughputHistory: history,
           blockedOverrides: merged,
+          isAdmin: adminStatus.is_admin,
           error: "",
           loading: false,
           lastUpdated: new Date().toISOString(),
@@ -110,6 +123,40 @@ export const useNetworkStore = create<NetworkStore>((set, get) => ({
       }
       await get().refresh();
     } catch (e) {
+      if (isAdminRequiredError(e)) {
+        const confirmed = window.confirm(
+          "Administrator access is required to change block state. Relaunch the app as Administrator now?",
+        );
+
+        if (confirmed) {
+          try {
+            await relaunchAsAdmin();
+          } catch (relaunchError) {
+            set((state) => ({
+              blockedOverrides: {
+                ...state.blockedOverrides,
+                [pathKey]: group.blocked,
+              },
+              error:
+                relaunchError instanceof Error
+                  ? relaunchError.message
+                  : String(relaunchError),
+            }));
+          }
+          return;
+        }
+
+        set((state) => ({
+          blockedOverrides: {
+            ...state.blockedOverrides,
+            [pathKey]: group.blocked,
+          },
+          error:
+            "Administrator privileges are required. Relaunch as Administrator to continue.",
+        }));
+        return;
+      }
+
       set((state) => ({
         blockedOverrides: {
           ...state.blockedOverrides,

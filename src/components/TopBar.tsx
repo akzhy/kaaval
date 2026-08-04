@@ -3,21 +3,27 @@ import { formatMbps } from "@/utils/format";
 
 type TopBarProps = {
   secure: boolean;
+  isAdmin: boolean;
   throughputMbps: number;
 };
 
-function TopBar({ secure, throughputMbps }: TopBarProps) {
+function TopBar({ secure, isAdmin, throughputMbps }: TopBarProps) {
+  const statusOk = secure && isAdmin;
+  const statusText = isAdmin
+    ? secure
+      ? "App Status: Running"
+      : "App Status: Attention Needed"
+    : "App Status: Administrator privileges required for blocking and modes";
+
   return (
     <header className="topbar">
       <div className="status">
         <span
           className={
-            secure ? "status-dot status-dot-ok" : "status-dot status-dot-bad"
+            statusOk ? "status-dot status-dot-ok" : "status-dot status-dot-bad"
           }
         />
-        <span className="status-label">
-          App Status: {secure ? "Running" : "Attention Needed"}
-        </span>
+        <span className="status-label">{statusText}</span>
       </div>
       <div className="net">
         <span className="net-label">Net</span>

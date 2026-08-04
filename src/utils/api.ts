@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
+  AdminStatus,
   AppMatcher,
   AppSettings,
   DashboardStats,
@@ -76,4 +77,12 @@ export function setTurnOffModesAndFiltersOnClose(enabled: boolean): Promise<AppS
   return invoke<AppSettings>("set_turn_off_modes_and_filters_on_close", {
     enabled,
   });
+}
+
+export function getAdminStatus(): Promise<AdminStatus> {
+  return invoke<AdminStatus>("get_admin_status");
+}
+
+export function relaunchAsAdmin(): Promise<{ success: boolean }> {
+  return invoke<{ success: boolean }>("relaunch_as_admin");
 }

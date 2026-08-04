@@ -1,16 +1,20 @@
 pub mod firewall;
-mod modes;
+pub mod modes;
 mod network;
 mod stats;
 
 use std::collections::HashSet;
 use std::path::PathBuf;
+use std::process::Command;
 use std::sync::{Mutex, Once};
 
 use base64::Engine;
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
 use tracing::{error, info, warn};
+
+#[cfg(windows)]
+use windows::Win32::UI::Shell::IsUserAnAdmin;
 
 use firewall::{FirewallManager, FirewallRuleDto};
 use modes::{AppMatcher, KnownAppDto, Mode, ModeType, ModesState};
@@ -46,6 +50,13 @@ struct FirewallResponse {
     success: bool,
 }
 
+const ADMIN_REQUIRED_ERROR: &str = "ADMIN_REQUIRED";
+
+#[derive(Debug, Clone, Serialize)]
+struct AdminStatus {
+    is_admin: bool,
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct AppSettings {
     #[serde(default)]
@@ -71,8 +82,7 @@ impl AppSettingsState {
     fn save(&self) -> Result<(), String> {
         let text = serde_json::to_string_pretty(&self.settings)
             .map_err(|err| format!("failed to serialize settings: {err}"))?;
-        std::fs::write(&self.path, text)
-            .map_err(|err| format!("failed to persist settings: {err}"))
+        std::fs::write(&self.path, text).map_err(|err| format!("failed to persist settings: {err}"))
     }
 }
 
@@ -112,42 +122,114 @@ fn disable_all_enforcement_on_exit(
     });
 }
 
+fn is_running_as_admin() -> bool {
+    #[cfg(windows)]
+    {
+        unsafe { IsUserAnAdmin().as_bool() }
+    }
+
+    #[cfg(not(windows))]
+    {
+        false
+    }
+}
+
+fn admin_required_error(action: &str) -> String {
+    return format!("{ADMIN_REQUIRED_ERROR}: administrator access is required for {action}");
+}
+
+fn quoted_ps(value: &str) -> String {
+    return format!("'{}'", value.replace('\'', "''"));
+}
+
+fn relaunch_self_as_admin() -> Result<(), String> {
+    let current_exe = std::env::current_exe()
+        .map_err(|err| format!("failed to resolve current executable path: {err}"))?;
+
+    let script = format!(
+        "$p = Start-Process -FilePath {} -Verb RunAs -PassThru; if ($null -eq $p) {{ exit 1 }}",
+        quoted_ps(&current_exe.to_string_lossy())
+    );
+
+    let output = Command::new("powershell")
+        .arg("-NoProfile")
+        .arg("-Command")
+        .arg(script)
+        .output()
+        .map_err(|err| format!("failed to launch elevation prompt: {err}"))?;
+
+    if output.status.success() {
+        return Ok(());
+    }
+
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    if stderr.is_empty() {
+        return Err("administrator relaunch was cancelled or failed".to_string());
+    }
+    Err(format!("administrator relaunch failed: {stderr}"))
+}
+
 #[tauri::command]
-fn block_application(path: String, state: tauri::State<'_, Mutex<FirewallState>>) -> Result<FirewallResponse, String> {
+fn block_application(
+    path: String,
+    state: tauri::State<'_, Mutex<FirewallState>>,
+) -> Result<FirewallResponse, String> {
     info!(path = %path, "blocking application");
+    if !is_running_as_admin() {
+        return Err(admin_required_error("blocking an application"));
+    }
     with_manager(&state, |manager| manager.block_app(path))?;
     Ok(FirewallResponse { success: true })
 }
 
 #[tauri::command]
-fn unblock_application(path: String, state: tauri::State<'_, Mutex<FirewallState>>) -> Result<FirewallResponse, String> {
+fn unblock_application(
+    path: String,
+    state: tauri::State<'_, Mutex<FirewallState>>,
+) -> Result<FirewallResponse, String> {
     info!(path = %path, "unblocking application");
+    if !is_running_as_admin() {
+        return Err(admin_required_error("unblocking an application"));
+    }
     with_manager(&state, |manager| manager.unblock_app(path))?;
     Ok(FirewallResponse { success: true })
 }
 
 #[tauri::command]
-fn is_application_blocked(path: String, state: tauri::State<'_, Mutex<FirewallState>>) -> Result<bool, String> {
+fn is_application_blocked(
+    path: String,
+    state: tauri::State<'_, Mutex<FirewallState>>,
+) -> Result<bool, String> {
     info!(path = %path, "checking block status");
     with_manager(&state, |manager| manager.is_blocked(path))
 }
 
 #[tauri::command]
-fn list_firewall_rules(state: tauri::State<'_, Mutex<FirewallState>>) -> Result<Vec<FirewallRuleDto>, String> {
+fn list_firewall_rules(
+    state: tauri::State<'_, Mutex<FirewallState>>,
+) -> Result<Vec<FirewallRuleDto>, String> {
     info!("listing managed firewall rules");
     let rules = with_manager(&state, |manager| manager.list_rules())?;
     Ok(rules.into_iter().map(Into::into).collect())
 }
 
 #[tauri::command]
-fn remove_all_firewall_rules(state: tauri::State<'_, Mutex<FirewallState>>) -> Result<FirewallResponse, String> {
+fn remove_all_firewall_rules(
+    state: tauri::State<'_, Mutex<FirewallState>>,
+) -> Result<FirewallResponse, String> {
     info!("removing all managed firewall rules");
+    if !is_running_as_admin() {
+        return Err(admin_required_error("removing firewall rules"));
+    }
     with_manager(&state, |manager| manager.remove_all_rules())?;
     Ok(FirewallResponse { success: true })
 }
 
 #[tauri::command]
-fn list_network_requests(state: tauri::State<'_, Mutex<FirewallState>>, modes_state: tauri::State<'_, Mutex<ModesState>>) -> Result<Vec<NetworkRequestDto>, String> {
+fn list_network_requests(
+    state: tauri::State<'_, Mutex<FirewallState>>,
+    modes_state: tauri::State<'_, Mutex<ModesState>>,
+) -> Result<Vec<NetworkRequestDto>, String> {
     info!("listing live network requests");
     let requests = network::list_network_requests()?;
 
@@ -175,7 +257,10 @@ fn list_network_requests(state: tauri::State<'_, Mutex<FirewallState>>, modes_st
     .unwrap_or_default();
 
     {
-        let modes = modes_state.inner().lock().map_err(|_| "failed to lock modes state".to_string())?;
+        let modes = modes_state
+            .inner()
+            .lock()
+            .map_err(|_| "failed to lock modes state".to_string())?;
         let mut observed = HashSet::new();
         for row in &requests {
             if row.app_path.starts_with("<pid:") {
@@ -201,9 +286,14 @@ fn list_network_requests(state: tauri::State<'_, Mutex<FirewallState>>, modes_st
 }
 
 #[tauri::command]
-fn get_dashboard_stats(state: tauri::State<'_, Mutex<FirewallState>>) -> Result<DashboardStatsDto, String> {
+fn get_dashboard_stats(
+    state: tauri::State<'_, Mutex<FirewallState>>,
+) -> Result<DashboardStatsDto, String> {
     let requests = network::list_network_requests()?;
-    let active_sessions = stats::active_sessions(&network::to_dto_with_blocking(requests, &Default::default()));
+    let active_sessions = stats::active_sessions(&network::to_dto_with_blocking(
+        requests,
+        &Default::default(),
+    ));
     let blocked_today = with_manager(&state, |manager| Ok(manager.blocked_today())).unwrap_or(0);
 
     Ok(DashboardStatsDto {
@@ -214,7 +304,12 @@ fn get_dashboard_stats(state: tauri::State<'_, Mutex<FirewallState>>) -> Result<
 }
 
 /// Applies or removes WFP enforcement for one mode's matched app, based on its type.
-fn apply_mode_enforcement(manager: &FirewallManager, mode_type: ModeType, path: &str, enabled: bool) {
+fn apply_mode_enforcement(
+    manager: &FirewallManager,
+    mode_type: ModeType,
+    path: &str,
+    enabled: bool,
+) {
     let result = match mode_type {
         ModeType::BlockAllExcept => manager.set_mode_permit(path, enabled),
         ModeType::BlockThese => manager.set_mode_block(path, enabled),
@@ -226,7 +321,11 @@ fn apply_mode_enforcement(manager: &FirewallManager, mode_type: ModeType, path: 
 
 /// Re-evaluates the active mode's matchers against known/observed apps and
 /// applies only the incremental filter changes needed (best-effort).
-fn reconcile_active_mode(modes_state: &ModesState, state: &tauri::State<'_, Mutex<FirewallState>>, observed: &HashSet<String>) {
+fn reconcile_active_mode(
+    modes_state: &ModesState,
+    state: &tauri::State<'_, Mutex<FirewallState>>,
+    observed: &HashSet<String>,
+) {
     let Some(mode) = modes_state.active_mode() else {
         return;
     };
@@ -239,11 +338,15 @@ fn reconcile_active_mode(modes_state: &ModesState, state: &tauri::State<'_, Mute
 
     let _ = with_manager(state, |manager| {
         for key in &to_add {
-            let path = modes_state.original_path_for(key).unwrap_or_else(|| key.clone());
+            let path = modes_state
+                .original_path_for(key)
+                .unwrap_or_else(|| key.clone());
             apply_mode_enforcement(manager, mode.mode_type, &path, true);
         }
         for key in &to_remove {
-            let path = modes_state.original_path_for(key).unwrap_or_else(|| key.clone());
+            let path = modes_state
+                .original_path_for(key)
+                .unwrap_or_else(|| key.clone());
             apply_mode_enforcement(manager, mode.mode_type, &path, false);
         }
         Ok(())
@@ -251,11 +354,17 @@ fn reconcile_active_mode(modes_state: &ModesState, state: &tauri::State<'_, Mute
 }
 
 /// Tears down all enforcement (default-deny and/or per-app filters) for a mode.
-fn teardown_mode(modes_state: &ModesState, state: &tauri::State<'_, Mutex<FirewallState>>, mode: &Mode) {
+fn teardown_mode(
+    modes_state: &ModesState,
+    state: &tauri::State<'_, Mutex<FirewallState>>,
+    mode: &Mode,
+) {
     let applied = modes_state.clear_applied();
     let _ = with_manager(state, |manager| {
         for key in &applied {
-            let path = modes_state.original_path_for(key).unwrap_or_else(|| key.clone());
+            let path = modes_state
+                .original_path_for(key)
+                .unwrap_or_else(|| key.clone());
             apply_mode_enforcement(manager, mode.mode_type, &path, false);
         }
         if mode.mode_type == ModeType::BlockAllExcept {
@@ -269,13 +378,21 @@ fn teardown_mode(modes_state: &ModesState, state: &tauri::State<'_, Mutex<Firewa
 
 #[tauri::command]
 fn list_modes(modes_state: tauri::State<'_, Mutex<ModesState>>) -> Result<Vec<Mode>, String> {
-    let modes = modes_state.inner().lock().map_err(|_| "failed to lock modes state".to_string())?;
+    let modes = modes_state
+        .inner()
+        .lock()
+        .map_err(|_| "failed to lock modes state".to_string())?;
     Ok(modes.list_modes())
 }
 
 #[tauri::command]
-fn list_known_apps(modes_state: tauri::State<'_, Mutex<ModesState>>) -> Result<Vec<KnownAppDto>, String> {
-    let modes = modes_state.inner().lock().map_err(|_| "failed to lock modes state".to_string())?;
+fn list_known_apps(
+    modes_state: tauri::State<'_, Mutex<ModesState>>,
+) -> Result<Vec<KnownAppDto>, String> {
+    let modes = modes_state
+        .inner()
+        .lock()
+        .map_err(|_| "failed to lock modes state".to_string())?;
     Ok(modes.list_known_apps())
 }
 
@@ -287,7 +404,10 @@ fn create_mode(
     matchers: Vec<AppMatcher>,
     modes_state: tauri::State<'_, Mutex<ModesState>>,
 ) -> Result<Mode, String> {
-    let modes = modes_state.inner().lock().map_err(|_| "failed to lock modes state".to_string())?;
+    let modes = modes_state
+        .inner()
+        .lock()
+        .map_err(|_| "failed to lock modes state".to_string())?;
     Ok(modes.create_mode(name, icon_data_url, mode_type, matchers))
 }
 
@@ -300,7 +420,10 @@ fn update_mode(
     matchers: Vec<AppMatcher>,
     modes_state: tauri::State<'_, Mutex<ModesState>>,
 ) -> Result<Mode, String> {
-    let modes = modes_state.inner().lock().map_err(|_| "failed to lock modes state".to_string())?;
+    let modes = modes_state
+        .inner()
+        .lock()
+        .map_err(|_| "failed to lock modes state".to_string())?;
     modes.update_mode(&id, name, icon_data_url, mode_type, matchers)
 }
 
@@ -310,7 +433,10 @@ fn delete_mode(
     modes_state: tauri::State<'_, Mutex<ModesState>>,
     state: tauri::State<'_, Mutex<FirewallState>>,
 ) -> Result<(), String> {
-    let modes = modes_state.inner().lock().map_err(|_| "failed to lock modes state".to_string())?;
+    let modes = modes_state
+        .inner()
+        .lock()
+        .map_err(|_| "failed to lock modes state".to_string())?;
     let removed = modes.delete_mode(&id)?;
     if removed.active {
         teardown_mode(&modes, &state, &removed);
@@ -325,7 +451,14 @@ fn set_mode_active(
     modes_state: tauri::State<'_, Mutex<ModesState>>,
     state: tauri::State<'_, Mutex<FirewallState>>,
 ) -> Result<Mode, String> {
-    let modes = modes_state.inner().lock().map_err(|_| "failed to lock modes state".to_string())?;
+    if !is_running_as_admin() {
+        return Err(admin_required_error("changing active mode"));
+    }
+
+    let modes = modes_state
+        .inner()
+        .lock()
+        .map_err(|_| "failed to lock modes state".to_string())?;
 
     if let Some(previous) = modes.active_mode() {
         if previous.id != id || !active {
@@ -346,6 +479,24 @@ fn set_mode_active(
 }
 
 #[tauri::command]
+fn get_admin_status() -> AdminStatus {
+    AdminStatus {
+        is_admin: is_running_as_admin(),
+    }
+}
+
+#[tauri::command]
+fn relaunch_as_admin(app: tauri::AppHandle) -> Result<FirewallResponse, String> {
+    if is_running_as_admin() {
+        return Ok(FirewallResponse { success: true });
+    }
+
+    relaunch_self_as_admin()?;
+    app.exit(0);
+    Ok(FirewallResponse { success: true })
+}
+
+#[tauri::command]
 fn pick_executable_path(app: tauri::AppHandle) -> Option<String> {
     use tauri_plugin_dialog::DialogExt;
     let picked = app
@@ -353,7 +504,10 @@ fn pick_executable_path(app: tauri::AppHandle) -> Option<String> {
         .file()
         .add_filter("Executable", &["exe"])
         .blocking_pick_file()?;
-    picked.into_path().ok().map(|p| p.to_string_lossy().to_string())
+    picked
+        .into_path()
+        .ok()
+        .map(|p| p.to_string_lossy().to_string())
 }
 
 #[tauri::command]
@@ -393,13 +547,14 @@ fn export_modes_file(content: String, destination: String) -> Result<(), String>
                 .map_err(|err| format!("failed to create parent directory: {err}"))?;
         }
     }
-    std::fs::write(path, content)
-        .map_err(|err| format!("failed to write export file: {err}"))?;
+    std::fs::write(path, content).map_err(|err| format!("failed to write export file: {err}"))?;
     Ok(())
 }
 
 #[tauri::command]
-fn get_app_settings(settings_state: tauri::State<'_, Mutex<AppSettingsState>>) -> Result<AppSettings, String> {
+fn get_app_settings(
+    settings_state: tauri::State<'_, Mutex<AppSettingsState>>,
+) -> Result<AppSettings, String> {
     let state = settings_state
         .inner()
         .lock()
@@ -482,7 +637,9 @@ pub fn run() {
             pick_icon_data_url,
             export_modes_file,
             get_app_settings,
-            set_turn_off_modes_and_filters_on_close
+            set_turn_off_modes_and_filters_on_close,
+            get_admin_status,
+            relaunch_as_admin
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
