@@ -1,5 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AppMatcher, DashboardStats, KnownApp, Mode, ModeType, NetworkRequest } from "./types";
+import type {
+  AppMatcher,
+  AppSettings,
+  DashboardStats,
+  KnownApp,
+  Mode,
+  ModeType,
+  NetworkRequest,
+} from "./types";
 
 export function listNetworkRequests(): Promise<NetworkRequest[]> {
   return invoke<NetworkRequest[]>("list_network_requests");
@@ -58,4 +66,14 @@ export function pickIconDataUrl(): Promise<string | null> {
 
 export function exportModesFile(content: string, destination: string): Promise<void> {
   return invoke("export_modes_file", { content, destination });
+}
+
+export function getAppSettings(): Promise<AppSettings> {
+  return invoke<AppSettings>("get_app_settings");
+}
+
+export function setTurnOffModesAndFiltersOnClose(enabled: boolean): Promise<AppSettings> {
+  return invoke<AppSettings>("set_turn_off_modes_and_filters_on_close", {
+    enabled,
+  });
 }

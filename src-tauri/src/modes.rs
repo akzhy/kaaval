@@ -371,6 +371,23 @@ impl ModesState {
         applied.clear();
         previous
     }
+
+    /// Deactivates any active mode and clears tracked applied paths.
+    /// Returns the previously active mode, if one was active.
+    pub fn deactivate_all(&self) -> Option<Mode> {
+        let mut modes = self.modes.lock().unwrap_or_else(|e| e.into_inner());
+        let previous = modes.iter().find(|m| m.active).cloned();
+
+        if previous.is_some() {
+            for mode in modes.iter_mut() {
+                mode.active = false;
+            }
+            self.save_modes(&modes);
+        }
+
+        self.clear_applied();
+        previous
+    }
 }
 
 fn current_epoch_secs() -> u64 {

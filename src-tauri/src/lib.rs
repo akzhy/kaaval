@@ -4,10 +4,11 @@ mod network;
 mod stats;
 
 use std::collections::HashSet;
+use std::path::PathBuf;
 use std::sync::{Mutex, Once};
 
 use base64::Engine;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::Manager;
 use tracing::{error, info, warn};
 
@@ -45,6 +46,36 @@ struct FirewallResponse {
     success: bool,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct AppSettings {
+    #[serde(default)]
+    turn_off_modes_and_filters_on_close: bool,
+}
+
+struct AppSettingsState {
+    path: PathBuf,
+    settings: AppSettings,
+}
+
+impl AppSettingsState {
+    fn init(app_data_dir: PathBuf) -> Self {
+        let path = app_data_dir.join("settings.json");
+        let settings = std::fs::read_to_string(&path)
+            .ok()
+            .and_then(|text| serde_json::from_str::<AppSettings>(&text).ok())
+            .unwrap_or_default();
+
+        Self { path, settings }
+    }
+
+    fn save(&self) -> Result<(), String> {
+        let text = serde_json::to_string_pretty(&self.settings)
+            .map_err(|err| format!("failed to serialize settings: {err}"))?;
+        std::fs::write(&self.path, text)
+            .map_err(|err| format!("failed to persist settings: {err}"))
+    }
+}
+
 fn with_manager<T>(
     state: &tauri::State<'_, Mutex<FirewallState>>,
     f: impl FnOnce(&FirewallManager) -> firewall::Result<T>,
@@ -62,6 +93,23 @@ fn with_manager<T>(
     })?;
 
     f(manager).map_err(|e| e.to_string())
+}
+
+fn disable_all_enforcement_on_exit(
+    modes_state: &ModesState,
+    firewall_state: &tauri::State<'_, Mutex<FirewallState>>,
+) {
+    modes_state.deactivate_all();
+
+    let _ = with_manager(firewall_state, |manager| {
+        if let Err(err) = manager.set_default_deny(false) {
+            warn!(error = %err, "failed to disable default-deny during app shutdown cleanup");
+        }
+        if let Err(err) = manager.remove_all_rules() {
+            warn!(error = %err, "failed to remove managed firewall rules during app shutdown cleanup");
+        }
+        Ok(())
+    });
 }
 
 #[tauri::command]
@@ -350,6 +398,29 @@ fn export_modes_file(content: String, destination: String) -> Result<(), String>
     Ok(())
 }
 
+#[tauri::command]
+fn get_app_settings(settings_state: tauri::State<'_, Mutex<AppSettingsState>>) -> Result<AppSettings, String> {
+    let state = settings_state
+        .inner()
+        .lock()
+        .map_err(|_| "failed to lock settings state".to_string())?;
+    Ok(state.settings.clone())
+}
+
+#[tauri::command]
+fn set_turn_off_modes_and_filters_on_close(
+    enabled: bool,
+    settings_state: tauri::State<'_, Mutex<AppSettingsState>>,
+) -> Result<AppSettings, String> {
+    let mut state = settings_state
+        .inner()
+        .lock()
+        .map_err(|_| "failed to lock settings state".to_string())?;
+    state.settings.turn_off_modes_and_filters_on_close = enabled;
+    state.save()?;
+    Ok(state.settings.clone())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     static TRACING_INIT: Once = Once::new();
@@ -366,8 +437,32 @@ pub fn run() {
         .manage(Mutex::new(FirewallState::init()))
         .setup(|app| {
             let data_dir = app.path().app_data_dir()?;
-            app.manage(Mutex::new(ModesState::init(data_dir)));
+            app.manage(Mutex::new(ModesState::init(data_dir.clone())));
+            app.manage(Mutex::new(AppSettingsState::init(data_dir)));
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                let app = window.app_handle();
+                let should_cleanup = app
+                    .state::<Mutex<AppSettingsState>>()
+                    .inner()
+                    .lock()
+                    .map(|state| state.settings.turn_off_modes_and_filters_on_close)
+                    .unwrap_or(false);
+
+                if !should_cleanup {
+                    return;
+                }
+
+                info!("app close requested; disabling modes and removing managed firewall filters");
+                let modes_state = app.state::<Mutex<ModesState>>();
+                let firewall_state = app.state::<Mutex<FirewallState>>();
+                match modes_state.inner().lock() {
+                    Ok(modes) => disable_all_enforcement_on_exit(&modes, &firewall_state),
+                    Err(_) => warn!("failed to lock modes state during app shutdown cleanup"),
+                }
+            }
         })
         .invoke_handler(tauri::generate_handler![
             block_application,
@@ -385,7 +480,9 @@ pub fn run() {
             set_mode_active,
             pick_executable_path,
             pick_icon_data_url,
-            export_modes_file
+            export_modes_file,
+            get_app_settings,
+            set_turn_off_modes_and_filters_on_close
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

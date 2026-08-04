@@ -51,3 +51,7 @@ export type KnownApp = {
   name: string;
   last_seen_secs: number;
 };
+
+export type AppSettings = {
+  turn_off_modes_and_filters_on_close: boolean;
+};
