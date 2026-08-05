@@ -76,12 +76,21 @@ impl Default for ThemePreference {
     }
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct AppSettings {
     #[serde(default)]
     turn_off_modes_and_filters_on_close: bool,
     #[serde(default)]
     theme_preference: ThemePreference,
+}
+
+impl Default for AppSettings {
+    fn default() -> Self {
+        Self {
+            turn_off_modes_and_filters_on_close: false,
+            theme_preference: ThemePreference::System,
+        }
+    }
 }
 
 struct AppSettingsState {
@@ -643,6 +652,26 @@ pub fn run() {
             app.manage(Mutex::new(ModesState::init(data_dir.clone())));
             app.manage(Mutex::new(AppSettingsState::init(data_dir.clone())));
             app.manage(Mutex::new(RecordingsState::init(data_dir)));
+
+            let firewall_state = app.state::<Mutex<FirewallState>>();
+
+            let should_refresh_default_deny = match app.state::<Mutex<ModesState>>().inner().lock()
+            {
+                Ok(modes) => matches!(
+                    modes.active_mode().map(|mode| mode.mode_type),
+                    Some(ModeType::BlockAllExcept)
+                ),
+                Err(_) => false,
+            };
+
+            if should_refresh_default_deny {
+                if let Err(err) =
+                    with_manager(&firewall_state, |manager| manager.set_default_deny(true))
+                {
+                    warn!(error = %err, "failed to refresh default-deny filters during startup");
+                }
+            }
+
             Ok(())
         })
         .on_window_event(|window, event| {

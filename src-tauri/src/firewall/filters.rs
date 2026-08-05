@@ -565,16 +565,28 @@ pub fn add_tagged_blanket_filters(
         let mut display_name_w = to_wide_null(&display_name);
         let mut description_w = to_wide_null(&description);
 
-        let mut conditions = [FWPM_FILTER_CONDITION0 {
-            fieldKey: FWPM_CONDITION_IP_PROTOCOL,
-            matchType: FWP_MATCH_EQUAL,
-            conditionValue: FWP_CONDITION_VALUE0 {
-                r#type: FWP_UINT8,
-                Anonymous: windows::Win32::NetworkManagement::WindowsFilteringPlatform::FWP_CONDITION_VALUE0_0 {
-                    uint8: spec.protocol,
+        let mut conditions = [
+            FWPM_FILTER_CONDITION0 {
+                fieldKey: FWPM_CONDITION_IP_PROTOCOL,
+                matchType: FWP_MATCH_EQUAL,
+                conditionValue: FWP_CONDITION_VALUE0 {
+                    r#type: FWP_UINT8,
+                    Anonymous: windows::Win32::NetworkManagement::WindowsFilteringPlatform::FWP_CONDITION_VALUE0_0 {
+                        uint8: spec.protocol,
+                    },
                 },
             },
-        }];
+            FWPM_FILTER_CONDITION0 {
+                fieldKey: FWPM_CONDITION_FLAGS,
+                matchType: FWP_MATCH_FLAGS_NONE_SET,
+                conditionValue: FWP_CONDITION_VALUE0 {
+                    r#type: FWP_UINT32,
+                    Anonymous: windows::Win32::NetworkManagement::WindowsFilteringPlatform::FWP_CONDITION_VALUE0_0 {
+                        uint32: FWP_CONDITION_FLAG_IS_LOOPBACK,
+                    },
+                },
+            },
+        ];
 
         let filter = FWPM_FILTER0 {
             filterKey: filter_key,

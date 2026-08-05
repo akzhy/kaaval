@@ -186,6 +186,7 @@ impl FirewallManager {
             let tx = self.engine.transaction()?;
             if enabled {
                 provider::ensure_provider_and_sublayer(&self.engine)?;
+                filters::delete_tagged_blanket_filters(&self.engine, MODE_TAG_DEFAULT_DENY)?;
                 filters::add_tagged_blanket_filters(
                     &self.engine,
                     MODE_TAG_DEFAULT_DENY,
