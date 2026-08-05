@@ -42,6 +42,7 @@ export type ModeType = "block_all_except" | "block_these";
 export type Mode = {
   id: string;
   name: string;
+  description: string | null;
   icon_data_url: string | null;
   mode_type: ModeType;
   matchers: AppMatcher[];

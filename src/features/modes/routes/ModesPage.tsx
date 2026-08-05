@@ -241,11 +241,11 @@ function ModesPage() {
 
       let created = 0;
       let replaced = 0;
-      let activated = 0;
 
       for (const step of plan) {
         const input = {
           name: step.importedMode.name,
+          description: step.importedMode.description ?? null,
           iconDataUrl: step.importedMode.icon_data_url,
           modeType: step.importedMode.mode_type,
           matchers: step.importedMode.matchers,
@@ -262,11 +262,6 @@ function ModesPage() {
             );
           }
           replaced += 1;
-
-          if (step.importedMode.active !== undefined) {
-            await setActive(step.targetId, step.importedMode.active);
-            activated += 1;
-          }
           continue;
         }
 
@@ -275,16 +270,11 @@ function ModesPage() {
           throw new Error(`Failed creating mode '${step.importedMode.name}'.`);
         }
         created += 1;
-
-        if (step.importedMode.active) {
-          await setActive(createdMode.id, true);
-          activated += 1;
-        }
       }
 
       await refresh();
       setNotice(
-        `Import complete: ${created} created, ${replaced} replaced, ${skipped} skipped${activated > 0 ? `, ${activated} active state updates` : ""}.`,
+        `Import complete: ${created} created, ${replaced} replaced, ${skipped} skipped.`,
       );
     } catch (e) {
       setNotice(

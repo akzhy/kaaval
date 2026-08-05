@@ -3,10 +3,10 @@ import type { AppMatcher, Mode, ModeType } from "@/utils/types";
 export type ImportedMode = {
   id?: string;
   name: string;
+  description?: string;
   icon_data_url: string | null;
   mode_type: ModeType;
   matchers: AppMatcher[];
-  active?: boolean;
 };
 
 export type ModesTransferFile = {
@@ -32,10 +32,12 @@ export function createExportPayload(modes: Mode[]): ModesTransferFile {
     modes: modes.map((mode) => ({
       id: mode.id,
       name: mode.name,
+      ...(mode.description?.trim()
+        ? { description: mode.description.trim() }
+        : {}),
       icon_data_url: mode.icon_data_url,
       mode_type: mode.mode_type,
       matchers: mode.matchers,
-      active: mode.active,
     })),
   };
 }
@@ -77,10 +79,10 @@ export function validateImportedModes(raw: unknown): ImportedMode[] {
     const mode = entry as {
       id?: unknown;
       name?: unknown;
+      description?: unknown;
       icon_data_url?: unknown;
       mode_type?: unknown;
       matchers?: unknown;
-      active?: unknown;
     };
 
     if (typeof mode.name !== "string" || !mode.name.trim()) {
@@ -88,6 +90,13 @@ export function validateImportedModes(raw: unknown): ImportedMode[] {
     }
     if (mode.id !== undefined && typeof mode.id !== "string") {
       throw new Error(`Mode '${mode.name}' has an invalid id.`);
+    }
+    if (
+      mode.description !== undefined &&
+      mode.description !== null &&
+      typeof mode.description !== "string"
+    ) {
+      throw new Error(`Mode '${mode.name}' has an invalid description.`);
     }
     if (
       mode.icon_data_url !== null &&
@@ -138,17 +147,15 @@ export function validateImportedModes(raw: unknown): ImportedMode[] {
     }
     seenNames.add(key);
 
-    if (mode.active !== undefined && typeof mode.active !== "boolean") {
-      throw new Error(`Mode '${trimmedName}' has an invalid active flag.`);
-    }
+    const trimmedDescription = mode.description?.trim();
 
     return {
       id: mode.id,
       name: trimmedName,
+      ...(trimmedDescription ? { description: trimmedDescription } : {}),
       icon_data_url: mode.icon_data_url ?? null,
       mode_type: mode.mode_type,
       matchers,
-      active: mode.active,
     };
   });
 

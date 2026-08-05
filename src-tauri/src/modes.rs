@@ -44,6 +44,8 @@ pub enum ModeType {
 pub struct Mode {
     pub id: String,
     pub name: String,
+    #[serde(default)]
+    pub description: Option<String>,
     pub icon_data_url: Option<String>,
     pub mode_type: ModeType,
     pub matchers: Vec<AppMatcher>,
@@ -202,6 +204,7 @@ impl ModesState {
     pub fn create_mode(
         &self,
         name: String,
+        description: Option<String>,
         icon_data_url: Option<String>,
         mode_type: ModeType,
         matchers: Vec<AppMatcher>,
@@ -209,6 +212,7 @@ impl ModesState {
         let mode = Mode {
             id: Uuid::new_v4().to_string(),
             name,
+            description,
             icon_data_url,
             mode_type,
             matchers,
@@ -225,6 +229,7 @@ impl ModesState {
         &self,
         id: &str,
         name: String,
+        description: Option<String>,
         icon_data_url: Option<String>,
         mode_type: ModeType,
         matchers: Vec<AppMatcher>,
@@ -235,6 +240,7 @@ impl ModesState {
             .find(|m| m.id == id)
             .ok_or_else(|| format!("mode not found: {id}"))?;
         mode.name = name;
+        mode.description = description;
         mode.icon_data_url = icon_data_url;
         mode.mode_type = mode_type;
         mode.matchers = matchers;

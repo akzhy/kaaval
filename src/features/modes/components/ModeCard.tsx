@@ -70,6 +70,9 @@ function ModeCard({
           </div>
 
           <p className="mode-card-label">{modeTypeLabel(mode)}</p>
+          {mode.description ? (
+            <p className="mode-card-description">{mode.description}</p>
+          ) : null}
           <div className="mode-card-chips">
             {mode.matchers.slice(0, matcherLimit).map((matcher) => (
               <span
@@ -193,6 +196,17 @@ ModeCard.flair = css`
     margin: 0;
     font-size: 0.75rem;
     color: $colors.text-muted;
+  }
+
+  .mode-card-description {
+    margin: 0;
+    font-size: 0.78rem;
+    color: $colors.text;
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 
   .mode-card-chips {

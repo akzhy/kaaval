@@ -42,6 +42,9 @@ function ModeForm({ initialMode, onClose }: ModeFormProps) {
   const pickExecutable = useModesStore((state) => state.pickExecutable);
 
   const [name, setName] = useState(initialMode?.name ?? "");
+  const [description, setDescription] = useState(
+    initialMode?.description ?? "",
+  );
   const [iconDataUrl, setIconDataUrl] = useState<string | null>(
     initialMode?.icon_data_url ?? null,
   );
@@ -118,7 +121,14 @@ function ModeForm({ initialMode, onClose }: ModeFormProps) {
 
     setSaving(true);
     setError("");
-    const input = { name: name.trim(), iconDataUrl, modeType, matchers };
+    const trimmedDescription = description.trim();
+    const input = {
+      name: name.trim(),
+      description: trimmedDescription ? trimmedDescription : null,
+      iconDataUrl,
+      modeType,
+      matchers,
+    };
     const result = initialMode
       ? await updateModeAction(initialMode.id, input)
       : await createModeAction(input);
@@ -145,6 +155,20 @@ function ModeForm({ initialMode, onClose }: ModeFormProps) {
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="e.g. Gaming Mode"
+        />
+      </div>
+
+      <div className="mode-form-row">
+        <label className="mode-form-label" htmlFor="mode-description">
+          Description (optional)
+        </label>
+        <textarea
+          id="mode-description"
+          className="mode-form-input mode-form-textarea"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="What this mode is for, e.g. only game + anti-cheat traffic"
+          rows={3}
         />
       </div>
 
@@ -366,6 +390,11 @@ ModeForm.flair = css`
   .mode-form-input:focus,
   .mode-form-select:focus {
     outline: 1px solid $colors.primary;
+  }
+
+  .mode-form-textarea {
+    resize: vertical;
+    min-height: 72px;
   }
 
   .mode-form-icon-row {

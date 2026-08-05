@@ -415,6 +415,7 @@ fn list_known_apps(
 #[tauri::command]
 fn create_mode(
     name: String,
+    description: Option<String>,
     icon_data_url: Option<String>,
     mode_type: ModeType,
     matchers: Vec<AppMatcher>,
@@ -424,13 +425,14 @@ fn create_mode(
         .inner()
         .lock()
         .map_err(|_| "failed to lock modes state".to_string())?;
-    Ok(modes.create_mode(name, icon_data_url, mode_type, matchers))
+    Ok(modes.create_mode(name, description, icon_data_url, mode_type, matchers))
 }
 
 #[tauri::command]
 fn update_mode(
     id: String,
     name: String,
+    description: Option<String>,
     icon_data_url: Option<String>,
     mode_type: ModeType,
     matchers: Vec<AppMatcher>,
@@ -440,7 +442,7 @@ fn update_mode(
         .inner()
         .lock()
         .map_err(|_| "failed to lock modes state".to_string())?;
-    modes.update_mode(&id, name, icon_data_url, mode_type, matchers)
+    modes.update_mode(&id, name, description, icon_data_url, mode_type, matchers)
 }
 
 #[tauri::command]

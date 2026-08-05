@@ -37,6 +37,7 @@ export function listKnownApps(): Promise<KnownApp[]> {
 
 export type ModeInput = {
   name: string;
+  description: string | null;
   iconDataUrl: string | null;
   modeType: ModeType;
   matchers: AppMatcher[];
