@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { css } from "@flairjs/client";
+import { Pencil, Trash2 } from "lucide-react";
 import Card from "@/components/Card";
 import Modal from "@/components/Modal";
 import Switch from "@/components/Switch";
@@ -89,25 +90,28 @@ function ModeCard({
             ) : null}
           </div>
 
-          <div className="mode-card-actions">
-            <button
-              type="button"
-              className="mode-action-btn"
-              onClick={() => onEdit?.()}
-              disabled={!onEdit}
-            >
-              Edit
-            </button>
-            {onDelete && (
+          <div className="mode-card-footer">
+            <div className="mode-card-footer-actions">
               <button
                 type="button"
-                className="mode-action-btn"
-                onClick={openDeleteConfirm}
-                disabled={!onDelete}
+                className="mode-footer-btn"
+                onClick={() => onEdit?.()}
+                disabled={!onEdit}
+                aria-label="Edit"
               >
-                Delete
+                <Pencil size={14} />
               </button>
-            )}
+              {onDelete && (
+                <button
+                  type="button"
+                  className="mode-footer-btn mode-footer-btn-danger"
+                  onClick={openDeleteConfirm}
+                  aria-label="Delete"
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </Card>
@@ -228,16 +232,58 @@ ModeCard.flair = css`
     white-space: nowrap;
   }
 
-  .mode-card-actions {
+  .mode-card-footer {
     margin-top: auto;
+    margin-left: -16px;
+    margin-right: -16px;
+    margin-bottom: -16px;
+    border-top: 1px solid $colors.border;
+    padding: 8px 12px;
     display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .mode-card-footer-actions {
+    display: flex;
+    gap: 4px;
     align-items: center;
   }
 
+  .mode-footer-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background-color: transparent;
+    border: 1px solid $colors.border;
+    border-radius: $radii.card;
+    color: $colors.text-muted;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  .mode-footer-btn:hover {
+    background-color: $colors.surface;
+    color: $colors.text;
+  }
+
+  .mode-footer-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .mode-footer-btn-danger {
+    border-color: $colors.negative;
+    color: $colors.negative;
+  }
+
+  .mode-footer-btn-danger:hover {
+    background-color: $colors.negative;
+    color: #fff;
+  }
+
   .mode-action-btn {
-    flex: 1 1 110px;
     background-color: $colors.surface;
     border: 1px solid $colors.border;
     border-radius: $radii.card;
@@ -257,6 +303,11 @@ ModeCard.flair = css`
     border-color: $colors.negative;
     color: $colors.negative;
     font-weight: 600;
+
+    &:hover {
+      background-color: $colors.negative;
+      color: #fff;
+    }
   }
 
   .mode-delete-confirm {
