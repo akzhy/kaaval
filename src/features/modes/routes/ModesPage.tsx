@@ -16,6 +16,7 @@ import {
   type ImportedMode,
   type ImportDecision,
 } from "../utils/modesTransfer";
+import { formatDateForFilename } from "../utils/utils";
 
 type ModesPageSearch = {
   modeId?: string;
@@ -127,7 +128,7 @@ function ModesPage() {
       }
 
       const payload = createExportPayload(selectedModes);
-      const dateToken = new Date().toISOString().slice(0, 10);
+      const dateToken = formatDateForFilename(new Date());
       const fileName = `kaaval-modes-${dateToken}.json`;
       const destination = `${resolvedPath.replace(/\\/g, "/")}/${fileName}`;
       const content = JSON.stringify(payload, null, 2);

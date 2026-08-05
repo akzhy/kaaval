@@ -18,6 +18,8 @@ export type ModesTransferFile = {
 
 export type ImportDecision = "replace" | "copy" | "skip" | "cancel";
 
+const MAX_EXPORTED_ICON_BYTES = 10 * 1024;
+
 export function modeTypeLabel(mode: Mode): string {
   return mode.mode_type === "block_all_except"
     ? "Block all except"
@@ -35,11 +37,48 @@ export function createExportPayload(modes: Mode[]): ModesTransferFile {
       ...(mode.description?.trim()
         ? { description: mode.description.trim() }
         : {}),
-      icon_data_url: mode.icon_data_url,
+      icon_data_url: getExportableIconDataUrl(mode.icon_data_url),
       mode_type: mode.mode_type,
       matchers: mode.matchers,
     })),
   };
+}
+
+function getExportableIconDataUrl(iconDataUrl: string | null): string | null {
+  if (!iconDataUrl) {
+    return null;
+  }
+
+  const byteSize = getDataUrlByteSize(iconDataUrl);
+  if (byteSize === null || byteSize > MAX_EXPORTED_ICON_BYTES) {
+    return null;
+  }
+
+  return iconDataUrl;
+}
+
+function getDataUrlByteSize(dataUrl: string): number | null {
+  const commaIndex = dataUrl.indexOf(",");
+  if (commaIndex <= 0) {
+    return null;
+  }
+
+  const header = dataUrl.slice(0, commaIndex);
+  const payload = dataUrl.slice(commaIndex + 1).trim();
+  if (!header.startsWith("data:")) {
+    return null;
+  }
+
+  if (header.includes(";base64")) {
+    const padding = payload.endsWith("==") ? 2 : payload.endsWith("=") ? 1 : 0;
+    return Math.floor((payload.length * 3) / 4) - padding;
+  }
+
+  try {
+    return new TextEncoder().encode(decodeURIComponent(payload)).length;
+  } catch {
+    return null;
+  }
 }
 
 export function downloadJson(filename: string, payload: unknown) {
