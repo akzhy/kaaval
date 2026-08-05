@@ -7,6 +7,9 @@ import type {
   KnownApp,
   Mode,
   ModeType,
+  RecordingFile,
+  RecordingStatus,
+  RecordingSummary,
   NetworkRequest,
   ThemePreference,
 } from "./types";
@@ -98,4 +101,24 @@ export function getAdminStatus(): Promise<AdminStatus> {
 
 export function relaunchAsAdmin(): Promise<{ success: boolean }> {
   return invoke<{ success: boolean }>("relaunch_as_admin");
+}
+
+export function getRecordingStatus(): Promise<RecordingStatus> {
+  return invoke<RecordingStatus>("get_recording_status");
+}
+
+export function startRecording(): Promise<RecordingStatus> {
+  return invoke<RecordingStatus>("start_recording");
+}
+
+export function stopRecording(name?: string): Promise<RecordingSummary> {
+  return invoke<RecordingSummary>("stop_recording", { name });
+}
+
+export function listRecordings(): Promise<RecordingSummary[]> {
+  return invoke<RecordingSummary[]>("list_recordings");
+}
+
+export function getRecording(id: string): Promise<RecordingFile> {
+  return invoke<RecordingFile>("get_recording", { id });
 }

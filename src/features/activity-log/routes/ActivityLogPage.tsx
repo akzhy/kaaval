@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { css } from "@flairjs/client";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -14,7 +15,34 @@ function ActivityLogPage() {
   const busyPath = useNetworkStore((state) => state.busyPath);
   const toggleBlock = useNetworkStore((state) => state.toggleBlock);
   const lastUpdated = useNetworkStore((state) => state.lastUpdated);
+  const recordingStatus = useNetworkStore((state) => state.recordingStatus);
+  const recordingBusy = useNetworkStore((state) => state.recordingBusy);
+  const startRecording = useNetworkStore((state) => state.startRecording);
+  const stopRecording = useNetworkStore((state) => state.stopRecording);
   const [search, setSearch] = useState("");
+
+  function suggestedRecordingName(startedAtMs: number | null) {
+    const date = new Date(startedAtMs ?? Date.now());
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `recording-${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+      date.getDate(),
+    )}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
+  }
+
+  async function onRecordClick() {
+    if (!recordingStatus.is_recording) {
+      await startRecording();
+      return;
+    }
+
+    const fallbackName = suggestedRecordingName(recordingStatus.started_at_ms);
+    const entered = window.prompt("Recording name", fallbackName);
+    if (entered === null) {
+      return;
+    }
+
+    await stopRecording(entered.trim() || fallbackName);
+  }
 
   const groups = useMemo(
     () => buildApplicationGroups(requests, blockedOverrides),
@@ -113,12 +141,33 @@ function ActivityLogPage() {
                 : "Waiting for first snapshot"}
             </p>
           </div>
-          <input
-            className="activity-log-search"
-            placeholder="Search processes…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          <div className="activity-log-actions">
+            <input
+              className="activity-log-search"
+              placeholder="Search processes…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <button
+              type="button"
+              className={
+                recordingStatus.is_recording
+                  ? "record-btn record-btn-stop"
+                  : "record-btn record-btn-start"
+              }
+              onClick={onRecordClick}
+              disabled={recordingBusy}
+            >
+              {recordingBusy
+                ? "Working…"
+                : recordingStatus.is_recording
+                  ? `Record (On: ${recordingStatus.event_count})`
+                  : "Record"}
+            </button>
+            <Link to="/activity-log/recordings" className="recordings-link">
+              View Recordings
+            </Link>
+          </div>
         </div>
 
         <DataTable
@@ -147,6 +196,12 @@ ActivityLogPage.flair = css`
     margin-bottom: 14px;
   }
 
+  .activity-log-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
   .activity-log-title {
     margin: 0;
     font-size: 1rem;
@@ -172,6 +227,36 @@ ActivityLogPage.flair = css`
 
   .activity-log-search:focus {
     outline: 1px solid $colors.primary;
+  }
+
+  .record-btn {
+    border: none;
+    border-radius: $radii.card;
+    padding: 8px 12px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    color: white;
+  }
+
+  .record-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .record-btn-start {
+    background: color-mix(in srgb, $colors.primary, black 8%);
+  }
+
+  .record-btn-stop {
+    background: $colors.negative;
+  }
+
+  .recordings-link {
+    color: $colors.primary;
+    text-decoration: none;
+    font-size: 0.8rem;
+    font-weight: 600;
   }
 
   .process-name {

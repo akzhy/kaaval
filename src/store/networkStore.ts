@@ -3,8 +3,11 @@ import {
   blockApplication,
   getAdminStatus,
   getDashboardStats,
+  getRecordingStatus,
   listNetworkRequests,
   relaunchAsAdmin,
+  startRecording as startRecordingApi,
+  stopRecording as stopRecordingApi,
   unblockApplication,
 } from "@/utils/api";
 import { isAdminRequiredError } from "@/utils/admin";
@@ -14,6 +17,8 @@ import type {
   ApplicationGroup,
   DashboardStats,
   NetworkRequest,
+  RecordingStatus,
+  RecordingSummary,
 } from "@/utils/types";
 
 const THROUGHPUT_HISTORY_LENGTH = 100;
@@ -28,8 +33,12 @@ type NetworkStore = {
   lastUpdated: string;
   busyPath: string;
   isAdmin: boolean;
+  recordingStatus: RecordingStatus;
+  recordingBusy: boolean;
   refresh: () => Promise<void>;
   toggleBlock: (group: ApplicationGroup) => Promise<void>;
+  startRecording: () => Promise<void>;
+  stopRecording: (name?: string) => Promise<RecordingSummary>;
 };
 
 export const useNetworkStore = create<NetworkStore>((set, get) => ({
@@ -42,14 +51,22 @@ export const useNetworkStore = create<NetworkStore>((set, get) => ({
   lastUpdated: "",
   busyPath: "",
   isAdmin: false,
+  recordingStatus: {
+    is_recording: false,
+    started_at_ms: null,
+    event_count: 0,
+  },
+  recordingBusy: false,
 
   async refresh() {
     try {
-      const [requests, dashboardStats, adminStatus] = await Promise.all([
-        listNetworkRequests(),
-        getDashboardStats(),
-        getAdminStatus(),
-      ]);
+      const [requests, dashboardStats, adminStatus, recordingStatus] =
+        await Promise.all([
+          listNetworkRequests(),
+          getDashboardStats(),
+          getAdminStatus(),
+          getRecordingStatus(),
+        ]);
 
       set((state) => {
         const merged = { ...state.blockedOverrides };
@@ -80,6 +97,7 @@ export const useNetworkStore = create<NetworkStore>((set, get) => ({
           throughputHistory: history,
           blockedOverrides: merged,
           isAdmin: adminStatus.is_admin,
+          recordingStatus,
           error: "",
           loading: false,
           lastUpdated: new Date().toISOString(),
@@ -160,6 +178,34 @@ export const useNetworkStore = create<NetworkStore>((set, get) => ({
       }));
     } finally {
       set({ busyPath: "" });
+    }
+  },
+
+  async startRecording() {
+    set({ recordingBusy: true, error: "" });
+    try {
+      const status = await startRecordingApi();
+      set({ recordingStatus: status });
+    } catch (e) {
+      set({ error: e instanceof Error ? e.message : String(e) });
+    } finally {
+      set({ recordingBusy: false });
+    }
+  },
+
+  async stopRecording(name?: string) {
+    set({ recordingBusy: true, error: "" });
+    try {
+      const summary = await stopRecordingApi(name);
+      const status = await getRecordingStatus();
+      set({ recordingStatus: status });
+      return summary;
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      set({ error: message });
+      throw new Error(message);
+    } finally {
+      set({ recordingBusy: false });
     }
   },
 }));

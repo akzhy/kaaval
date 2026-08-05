@@ -83,6 +83,7 @@ Sidebar.flair = css`
     transition:
       width 0.2s ease,
       padding 0.2s ease;
+    position: relative;
   }
 
   .sidebar-collapsed {

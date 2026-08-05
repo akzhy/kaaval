@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::ffi::c_void;
 use std::net::{Ipv4Addr, Ipv6Addr};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tracing::debug;
 use windows::core::PWSTR;
 use windows::Win32::Foundation::{BOOL, CloseHandle, HANDLE};
@@ -17,7 +17,7 @@ use windows::Win32::System::Threading::{
     OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
 };
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkRequestDto {
     pub app_path: String,
     pub app_name: String,

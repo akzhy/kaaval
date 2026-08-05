@@ -6,6 +6,8 @@ import {
 import RootLayout from "./root";
 import DashboardPage from "@/features/dashboard/routes/DashboardPage";
 import ActivityLogPage from "@/features/activity-log/routes/ActivityLogPage";
+import RecordingsPage from "@/features/activity-log/routes/RecordingsPage";
+import RecordingDetailPage from "@/features/activity-log/routes/RecordingDetailPage";
 import ModesPage from "@/features/modes/routes/ModesPage";
 import SettingsPage from "@/features/settings/routes/SettingsPage";
 
@@ -29,6 +31,18 @@ const activityLogRoute = createRoute({
   component: ActivityLogPage,
 });
 
+const recordingsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/activity-log/recordings",
+  component: RecordingsPage,
+});
+
+const recordingDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/activity-log/recordings/$recordingId",
+  component: RecordingDetailPage,
+});
+
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/settings",
@@ -39,6 +53,8 @@ const routeTree = rootRoute.addChildren([
   dashboardRoute,
   modesRoute,
   activityLogRoute,
+  recordingsRoute,
+  recordingDetailRoute,
   settingsRoute,
 ]);
 

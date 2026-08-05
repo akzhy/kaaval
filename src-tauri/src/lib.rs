@@ -1,6 +1,7 @@
 pub mod firewall;
 pub mod modes;
 mod network;
+mod network_recording;
 mod stats;
 
 use std::collections::HashSet;
@@ -19,6 +20,10 @@ use windows::Win32::UI::Shell::IsUserAnAdmin;
 use firewall::{FirewallManager, FirewallRuleDto};
 use modes::{AppMatcher, KnownAppDto, Mode, ModeType, ModesState};
 use network::NetworkRequestDto;
+use network_recording::{
+    get_recording, get_recording_status, list_recordings, start_recording, stop_recording,
+    RecordingsState,
+};
 use stats::DashboardStatsDto;
 
 #[derive(Default)]
@@ -245,6 +250,7 @@ fn remove_all_firewall_rules(
 fn list_network_requests(
     state: tauri::State<'_, Mutex<FirewallState>>,
     modes_state: tauri::State<'_, Mutex<ModesState>>,
+    recordings_state: tauri::State<'_, Mutex<RecordingsState>>,
 ) -> Result<Vec<NetworkRequestDto>, String> {
     info!("listing live network requests");
     let requests = network::list_network_requests()?;
@@ -298,7 +304,17 @@ fn list_network_requests(
         reconcile_active_mode(&modes, &state, &observed);
     }
 
-    Ok(network::to_dto_with_blocking(requests, &blocked_paths))
+    let dto = network::to_dto_with_blocking(requests, &blocked_paths);
+
+    {
+        let mut recordings = recordings_state
+            .inner()
+            .lock()
+            .map_err(|_| "failed to lock recordings state".to_string())?;
+        recordings.append_snapshot(&dto);
+    }
+
+    Ok(dto)
 }
 
 #[tauri::command]
@@ -625,7 +641,8 @@ pub fn run() {
         .setup(|app| {
             let data_dir = app.path().app_data_dir()?;
             app.manage(Mutex::new(ModesState::init(data_dir.clone())));
-            app.manage(Mutex::new(AppSettingsState::init(data_dir)));
+            app.manage(Mutex::new(AppSettingsState::init(data_dir.clone())));
+            app.manage(Mutex::new(RecordingsState::init(data_dir)));
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -659,6 +676,11 @@ pub fn run() {
             remove_all_firewall_rules,
             list_network_requests,
             get_dashboard_stats,
+            get_recording_status,
+            start_recording,
+            stop_recording,
+            list_recordings,
+            get_recording,
             list_modes,
             list_known_apps,
             create_mode,

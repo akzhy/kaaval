@@ -63,3 +63,30 @@ export type AppSettings = {
 export type AdminStatus = {
   is_admin: boolean;
 };
+
+export type RecordingStatus = {
+  is_recording: boolean;
+  started_at_ms: number | null;
+  event_count: number;
+};
+
+export type RecordedNetworkEvent = NetworkRequest & {
+  captured_at_ms: number;
+};
+
+export type RecordingSummary = {
+  id: string;
+  name: string;
+  started_at_ms: number;
+  stopped_at_ms: number;
+  event_count: number;
+};
+
+export type RecordingFile = {
+  schema_version: number;
+  id: string;
+  name: string;
+  started_at_ms: number;
+  stopped_at_ms: number;
+  events: RecordedNetworkEvent[];
+};
