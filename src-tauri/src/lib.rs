@@ -76,10 +76,16 @@ impl Default for ThemePreference {
     }
 }
 
+fn default_true() -> bool {
+    true
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct AppSettings {
     #[serde(default)]
     turn_off_modes_and_filters_on_close: bool,
+    #[serde(default = "default_true")]
+    block_internet_only: bool,
     #[serde(default)]
     theme_preference: ThemePreference,
 }
@@ -88,6 +94,7 @@ impl Default for AppSettings {
     fn default() -> Self {
         Self {
             turn_off_modes_and_filters_on_close: false,
+            block_internet_only: true,
             theme_preference: ThemePreference::System,
         }
     }
@@ -620,6 +627,27 @@ fn set_turn_off_modes_and_filters_on_close(
 }
 
 #[tauri::command]
+fn set_block_internet_only(
+    enabled: bool,
+    settings_state: tauri::State<'_, Mutex<AppSettingsState>>,
+    state: tauri::State<'_, Mutex<FirewallState>>,
+) -> Result<AppSettings, String> {
+    if !is_running_as_admin() {
+        return Err(admin_required_error("changing internet-only blocking"));
+    }
+
+    with_manager(&state, |manager| manager.set_local_traffic_allow(enabled))?;
+
+    let mut app_settings = settings_state
+        .inner()
+        .lock()
+        .map_err(|_| "failed to lock settings state".to_string())?;
+    app_settings.settings.block_internet_only = enabled;
+    app_settings.save()?;
+    Ok(app_settings.settings.clone())
+}
+
+#[tauri::command]
 fn set_theme_preference(
     theme_preference: ThemePreference,
     settings_state: tauri::State<'_, Mutex<AppSettingsState>>,
@@ -672,6 +700,23 @@ pub fn run() {
                 }
             }
 
+            let internet_only_enabled = app
+                .state::<Mutex<AppSettingsState>>()
+                .inner()
+                .lock()
+                .map(|settings| settings.settings.block_internet_only)
+                .unwrap_or(true);
+
+            if let Err(err) = with_manager(&firewall_state, |manager| {
+                manager.set_local_traffic_allow(internet_only_enabled)
+            }) {
+                warn!(
+                    error = %err,
+                    internet_only_enabled,
+                    "failed to sync internet-only local-traffic allow filters during startup"
+                );
+            }
+
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -721,6 +766,7 @@ pub fn run() {
             export_modes_file,
             get_app_settings,
             set_turn_off_modes_and_filters_on_close,
+            set_block_internet_only,
             set_theme_preference,
             get_admin_status,
             relaunch_as_admin

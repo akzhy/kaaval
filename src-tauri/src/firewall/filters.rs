@@ -9,10 +9,12 @@ use windows::Win32::NetworkManagement::WindowsFilteringPlatform::{
     FwpmFilterAdd0, FwpmFilterCreateEnumHandle0, FwpmFilterDeleteByKey0,
     FwpmFilterDestroyEnumHandle0, FwpmFilterEnum0, FwpmFilterGetByKey0, FwpmFreeMemory0,
     FWPM_ACTION0, FWPM_CONDITION_ALE_APP_ID, FWPM_CONDITION_FLAGS, FWPM_CONDITION_IP_PROTOCOL,
-    FWPM_DISPLAY_DATA0, FWPM_FILTER0, FWPM_FILTER_CONDITION0, FWPM_FILTER_ENUM_TEMPLATE0,
-    FWPM_FILTER_FLAGS, FWPM_FILTER_FLAG_CLEAR_ACTION_RIGHT, FWP_ACTION_BLOCK, FWP_ACTION_TYPE,
+    FWPM_CONDITION_IP_REMOTE_ADDRESS, FWPM_DISPLAY_DATA0, FWPM_FILTER0,
+    FWPM_FILTER_CONDITION0, FWPM_FILTER_ENUM_TEMPLATE0, FWPM_FILTER_FLAGS,
+    FWPM_FILTER_FLAG_CLEAR_ACTION_RIGHT, FWP_ACTION_BLOCK, FWP_ACTION_PERMIT, FWP_ACTION_TYPE,
     FWP_BYTE_BLOB, FWP_BYTE_BLOB_TYPE, FWP_CONDITION_FLAG_IS_LOOPBACK, FWP_CONDITION_VALUE0,
-    FWP_MATCH_EQUAL, FWP_MATCH_FLAGS_NONE_SET, FWP_UINT32, FWP_UINT8, FWP_VALUE0, FWP_VALUE0_0,
+    FWP_MATCH_EQUAL, FWP_MATCH_FLAGS_NONE_SET, FWP_UINT32, FWP_UINT8, FWP_V4_ADDR_AND_MASK,
+    FWP_V4_ADDR_MASK, FWP_V6_ADDR_AND_MASK, FWP_V6_ADDR_MASK, FWP_VALUE0, FWP_VALUE0_0,
 };
 
 const FWP_E_FILTER_NOT_FOUND: u32 = 0x8032_0003;
@@ -441,6 +443,128 @@ fn tagged_blanket_filter_key(tag: &str, spec: FilterSpec) -> GUID {
     GUID::from_u128(uuid.as_u128())
 }
 
+/// Same as `tagged_blanket_filter_key`, but additionally namespaces by
+/// destination range key so we can install multiple blanket filters per layer.
+fn tagged_blanket_range_filter_key(tag: &str, range_key: &str, spec: FilterSpec) -> GUID {
+    let material = format!(
+        "{tag}|{range_key}|{}|{}|{}",
+        spec.protocol,
+        spec.ip_version,
+        spec.layer_key.to_u128()
+    );
+    let uuid = Uuid::new_v5(&RULE_NAMESPACE, material.as_bytes());
+    GUID::from_u128(uuid.as_u128())
+}
+
+#[derive(Clone, Copy)]
+struct V4Prefix {
+    key: &'static str,
+    octets: [u8; 4],
+    prefix_len: u8,
+}
+
+#[derive(Clone, Copy)]
+struct V6Prefix {
+    key: &'static str,
+    addr: [u8; 16],
+    prefix_len: u8,
+}
+
+const LOCAL_V4_PREFIXES: [V4Prefix; 9] = [
+    V4Prefix {
+        key: "0.0.0.0-8",
+        octets: [0, 0, 0, 0],
+        prefix_len: 8,
+    },
+    V4Prefix {
+        key: "10.0.0.0-8",
+        octets: [10, 0, 0, 0],
+        prefix_len: 8,
+    },
+    V4Prefix {
+        key: "100.64.0.0-10",
+        octets: [100, 64, 0, 0],
+        prefix_len: 10,
+    },
+    V4Prefix {
+        key: "127.0.0.0-8",
+        octets: [127, 0, 0, 0],
+        prefix_len: 8,
+    },
+    V4Prefix {
+        key: "169.254.0.0-16",
+        octets: [169, 254, 0, 0],
+        prefix_len: 16,
+    },
+    V4Prefix {
+        key: "172.16.0.0-12",
+        octets: [172, 16, 0, 0],
+        prefix_len: 12,
+    },
+    V4Prefix {
+        key: "192.168.0.0-16",
+        octets: [192, 168, 0, 0],
+        prefix_len: 16,
+    },
+    V4Prefix {
+        key: "224.0.0.0-4",
+        octets: [224, 0, 0, 0],
+        prefix_len: 4,
+    },
+    V4Prefix {
+        key: "240.0.0.0-4",
+        octets: [240, 0, 0, 0],
+        prefix_len: 4,
+    },
+];
+
+const LOCAL_V6_PREFIXES: [V6Prefix; 5] = [
+    V6Prefix {
+        key: "::-128",
+        addr: [0; 16],
+        prefix_len: 128,
+    },
+    V6Prefix {
+        key: "::1-128",
+        addr: [
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+        ],
+        prefix_len: 128,
+    },
+    V6Prefix {
+        key: "fc00::-7",
+        addr: [
+            0xfc, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        ],
+        prefix_len: 7,
+    },
+    V6Prefix {
+        key: "fe80::-10",
+        addr: [
+            0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        ],
+        prefix_len: 10,
+    },
+    V6Prefix {
+        key: "ff00::-8",
+        addr: [
+            0xff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        ],
+        prefix_len: 8,
+    },
+];
+
+fn v4_mask(prefix_len: u8) -> u32 {
+    if prefix_len == 0 {
+        return 0;
+    }
+    u32::MAX << (32 - prefix_len)
+}
+
+fn v4_addr_from_octets(octets: [u8; 4]) -> u32 {
+    u32::from_be_bytes(octets)
+}
+
 /// Creates per-executable filters (scoped by app id) for a mode, tagged so they
 /// can be added/removed independently of manual blocks and other mode tags.
 pub fn add_tagged_app_filters(
@@ -627,6 +751,196 @@ pub fn add_tagged_blanket_filters(
     Ok(())
 }
 
+/// Creates high-priority blanket permit filters for local/non-internet
+/// destinations so internet-only blocking can still allow LAN/loopback traffic.
+pub fn add_tagged_local_permit_filters(
+    engine: &EngineHandle,
+    tag: &str,
+    weight: u8,
+) -> Result<()> {
+    for spec in FILTER_SPECS {
+        if spec.ip_version == "IPv4" {
+            for prefix in LOCAL_V4_PREFIXES {
+                let filter_key = tagged_blanket_range_filter_key(tag, prefix.key, spec);
+                let display_name =
+                    format!("Kaaval {tag} {} {} {}", spec.protocol_name, spec.ip_version, prefix.key);
+                let description = format!(
+                    "{RULE_DESCRIPTION} {} {} ({tag} {})",
+                    spec.protocol_name, spec.ip_version, prefix.key
+                );
+
+                let mut display_name_w = to_wide_null(&display_name);
+                let mut description_w = to_wide_null(&description);
+                let mask = v4_mask(prefix.prefix_len);
+                let mut remote_v4 = FWP_V4_ADDR_AND_MASK {
+                    addr: v4_addr_from_octets(prefix.octets) & mask,
+                    mask,
+                };
+
+                let mut conditions = [
+                    FWPM_FILTER_CONDITION0 {
+                        fieldKey: FWPM_CONDITION_IP_PROTOCOL,
+                        matchType: FWP_MATCH_EQUAL,
+                        conditionValue: FWP_CONDITION_VALUE0 {
+                            r#type: FWP_UINT8,
+                            Anonymous: windows::Win32::NetworkManagement::WindowsFilteringPlatform::FWP_CONDITION_VALUE0_0 {
+                                uint8: spec.protocol,
+                            },
+                        },
+                    },
+                    FWPM_FILTER_CONDITION0 {
+                        fieldKey: FWPM_CONDITION_FLAGS,
+                        matchType: FWP_MATCH_FLAGS_NONE_SET,
+                        conditionValue: FWP_CONDITION_VALUE0 {
+                            r#type: FWP_UINT32,
+                            Anonymous: windows::Win32::NetworkManagement::WindowsFilteringPlatform::FWP_CONDITION_VALUE0_0 {
+                                uint32: FWP_CONDITION_FLAG_IS_LOOPBACK,
+                            },
+                        },
+                    },
+                    FWPM_FILTER_CONDITION0 {
+                        fieldKey: FWPM_CONDITION_IP_REMOTE_ADDRESS,
+                        matchType: FWP_MATCH_EQUAL,
+                        conditionValue: FWP_CONDITION_VALUE0 {
+                            r#type: FWP_V4_ADDR_MASK,
+                            Anonymous: windows::Win32::NetworkManagement::WindowsFilteringPlatform::FWP_CONDITION_VALUE0_0 {
+                                v4AddrMask: &mut remote_v4,
+                            },
+                        },
+                    },
+                ];
+
+                let filter = FWPM_FILTER0 {
+                    filterKey: filter_key,
+                    displayData: FWPM_DISPLAY_DATA0 {
+                        name: PWSTR(display_name_w.as_mut_ptr()),
+                        description: PWSTR(description_w.as_mut_ptr()),
+                    },
+                    flags: FWPM_FILTER_FLAGS(FWPM_FILTER_FLAG_CLEAR_ACTION_RIGHT.0),
+                    providerKey: &PROVIDER_KEY as *const GUID as *mut GUID,
+                    providerData: Default::default(),
+                    layerKey: spec.layer_key,
+                    subLayerKey: SUBLAYER_KEY,
+                    weight: FWP_VALUE0 {
+                        r#type: FWP_UINT8,
+                        Anonymous: FWP_VALUE0_0 { uint8: weight },
+                    },
+                    numFilterConditions: conditions.len() as u32,
+                    filterCondition: conditions.as_mut_ptr(),
+                    action: FWPM_ACTION0 {
+                        r#type: FWP_ACTION_TYPE(FWP_ACTION_PERMIT.0),
+                        Anonymous: Default::default(),
+                    },
+                    ..Default::default()
+                };
+
+                debug!(
+                    tag,
+                    protocol = spec.protocol_name,
+                    ip_version = spec.ip_version,
+                    range = prefix.key,
+                    "creating local-traffic permit filter"
+                );
+                // SAFETY: filter and condition buffers remain alive for call duration.
+                let status = unsafe { FwpmFilterAdd0(engine.raw(), &filter, None, None) };
+                if status != ERROR_SUCCESS.0 {
+                    return Err(FirewallError::from_win32("FwpmFilterAdd0", status));
+                }
+            }
+            continue;
+        }
+
+        for prefix in LOCAL_V6_PREFIXES {
+            let filter_key = tagged_blanket_range_filter_key(tag, prefix.key, spec);
+            let display_name =
+                format!("Kaaval {tag} {} {} {}", spec.protocol_name, spec.ip_version, prefix.key);
+            let description = format!(
+                "{RULE_DESCRIPTION} {} {} ({tag} {})",
+                spec.protocol_name, spec.ip_version, prefix.key
+            );
+
+            let mut display_name_w = to_wide_null(&display_name);
+            let mut description_w = to_wide_null(&description);
+            let mut remote_v6 = FWP_V6_ADDR_AND_MASK {
+                addr: prefix.addr,
+                prefixLength: prefix.prefix_len,
+            };
+
+            let mut conditions = [
+                FWPM_FILTER_CONDITION0 {
+                    fieldKey: FWPM_CONDITION_IP_PROTOCOL,
+                    matchType: FWP_MATCH_EQUAL,
+                    conditionValue: FWP_CONDITION_VALUE0 {
+                        r#type: FWP_UINT8,
+                        Anonymous: windows::Win32::NetworkManagement::WindowsFilteringPlatform::FWP_CONDITION_VALUE0_0 {
+                            uint8: spec.protocol,
+                        },
+                    },
+                },
+                FWPM_FILTER_CONDITION0 {
+                    fieldKey: FWPM_CONDITION_FLAGS,
+                    matchType: FWP_MATCH_FLAGS_NONE_SET,
+                    conditionValue: FWP_CONDITION_VALUE0 {
+                        r#type: FWP_UINT32,
+                        Anonymous: windows::Win32::NetworkManagement::WindowsFilteringPlatform::FWP_CONDITION_VALUE0_0 {
+                            uint32: FWP_CONDITION_FLAG_IS_LOOPBACK,
+                        },
+                    },
+                },
+                FWPM_FILTER_CONDITION0 {
+                    fieldKey: FWPM_CONDITION_IP_REMOTE_ADDRESS,
+                    matchType: FWP_MATCH_EQUAL,
+                    conditionValue: FWP_CONDITION_VALUE0 {
+                        r#type: FWP_V6_ADDR_MASK,
+                        Anonymous: windows::Win32::NetworkManagement::WindowsFilteringPlatform::FWP_CONDITION_VALUE0_0 {
+                            v6AddrMask: &mut remote_v6,
+                        },
+                    },
+                },
+            ];
+
+            let filter = FWPM_FILTER0 {
+                filterKey: filter_key,
+                displayData: FWPM_DISPLAY_DATA0 {
+                    name: PWSTR(display_name_w.as_mut_ptr()),
+                    description: PWSTR(description_w.as_mut_ptr()),
+                },
+                flags: FWPM_FILTER_FLAGS(FWPM_FILTER_FLAG_CLEAR_ACTION_RIGHT.0),
+                providerKey: &PROVIDER_KEY as *const GUID as *mut GUID,
+                providerData: Default::default(),
+                layerKey: spec.layer_key,
+                subLayerKey: SUBLAYER_KEY,
+                weight: FWP_VALUE0 {
+                    r#type: FWP_UINT8,
+                    Anonymous: FWP_VALUE0_0 { uint8: weight },
+                },
+                numFilterConditions: conditions.len() as u32,
+                filterCondition: conditions.as_mut_ptr(),
+                action: FWPM_ACTION0 {
+                    r#type: FWP_ACTION_TYPE(FWP_ACTION_PERMIT.0),
+                    Anonymous: Default::default(),
+                },
+                ..Default::default()
+            };
+
+            debug!(
+                tag,
+                protocol = spec.protocol_name,
+                ip_version = spec.ip_version,
+                range = prefix.key,
+                "creating local-traffic permit filter"
+            );
+            // SAFETY: filter and condition buffers remain alive for call duration.
+            let status = unsafe { FwpmFilterAdd0(engine.raw(), &filter, None, None) };
+            if status != ERROR_SUCCESS.0 {
+                return Err(FirewallError::from_win32("FwpmFilterAdd0", status));
+            }
+        }
+    }
+
+    Ok(())
+}
+
 /// Deletes the blanket filters created by `add_tagged_blanket_filters`.
 pub fn delete_tagged_blanket_filters(engine: &EngineHandle, tag: &str) -> Result<()> {
     for spec in FILTER_SPECS {
@@ -640,6 +954,43 @@ pub fn delete_tagged_blanket_filters(engine: &EngineHandle, tag: &str) -> Result
             continue;
         }
         return Err(FirewallError::from_win32("FwpmFilterDeleteByKey0", status));
+    }
+
+    Ok(())
+}
+
+/// Deletes the local-traffic permit filters created by
+/// `add_tagged_local_permit_filters`.
+pub fn delete_tagged_local_permit_filters(engine: &EngineHandle, tag: &str) -> Result<()> {
+    for spec in FILTER_SPECS {
+        if spec.ip_version == "IPv4" {
+            for prefix in LOCAL_V4_PREFIXES {
+                let filter_key = tagged_blanket_range_filter_key(tag, prefix.key, spec);
+                // SAFETY: engine handle is valid and key pointer references a valid GUID.
+                let status = unsafe { FwpmFilterDeleteByKey0(engine.raw(), &filter_key) };
+                if status == ERROR_SUCCESS.0
+                    || status == FWP_E_NOT_FOUND
+                    || status == FWP_E_FILTER_NOT_FOUND
+                {
+                    continue;
+                }
+                return Err(FirewallError::from_win32("FwpmFilterDeleteByKey0", status));
+            }
+            continue;
+        }
+
+        for prefix in LOCAL_V6_PREFIXES {
+            let filter_key = tagged_blanket_range_filter_key(tag, prefix.key, spec);
+            // SAFETY: engine handle is valid and key pointer references a valid GUID.
+            let status = unsafe { FwpmFilterDeleteByKey0(engine.raw(), &filter_key) };
+            if status == ERROR_SUCCESS.0
+                || status == FWP_E_NOT_FOUND
+                || status == FWP_E_FILTER_NOT_FOUND
+            {
+                continue;
+            }
+            return Err(FirewallError::from_win32("FwpmFilterDeleteByKey0", status));
+        }
     }
 
     Ok(())
