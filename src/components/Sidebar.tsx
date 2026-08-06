@@ -7,17 +7,53 @@ import {
   ChartNoAxesCombined,
   ChevronLeft,
   ChevronRight,
+  type LucideIcon,
   Logs,
   Settings,
   SlidersHorizontal,
+  CirclePileIcon,
+  CassetteTapeIcon,
 } from "lucide-react";
 
-const NAV_ITEMS = [
+type NavItem = {
+  to: string;
+  label: string;
+  Icon: LucideIcon;
+  children?: readonly {
+    to: string;
+    label: string;
+    Icon?: LucideIcon;
+  }[];
+};
+
+const NAV_ITEMS: readonly NavItem[] = [
   { to: "/", label: "Dashboard", Icon: ChartNoAxesCombined },
-  { to: "/modes", label: "Modes", Icon: SlidersHorizontal },
-  { to: "/activity-log", label: "Activity Log", Icon: Logs },
+  {
+    to: "/modes",
+    label: "Modes",
+    Icon: SlidersHorizontal,
+    children: [
+      {
+        to: "/modes/community",
+        label: "Community Modes",
+        Icon: CirclePileIcon,
+      },
+    ],
+  },
+  {
+    to: "/activity-log",
+    label: "Activity Log",
+    Icon: Logs,
+    children: [
+      {
+        to: "/activity-log/recordings",
+        label: "Recordings",
+        Icon: CassetteTapeIcon,
+      },
+    ],
+  },
   { to: "/settings", label: "Settings", Icon: Settings },
-] as const;
+];
 
 function Sidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -33,25 +69,58 @@ function Sidebar() {
       </div>
 
       <nav className="nav">
-        {NAV_ITEMS.map(({ to, label, Icon }) => {
+        {NAV_ITEMS.map(({ to, label, Icon, children }) => {
           const isActive =
             to === "/"
               ? currentPath === "/"
               : currentPath === to || currentPath.startsWith(`${to}/`);
+          const hasActiveChild =
+            !!children &&
+            children.some(
+              (child) =>
+                currentPath === child.to || currentPath.startsWith(`${child.to}/`),
+            );
+          const showChildren = !isCollapsed && isActive && children?.length;
 
           return (
-            <Link
-              key={to}
-              to={to}
-              className={clsx("nav-link", {
-                "nav-link-active": isActive,
-                "nav-link-collapsed": isCollapsed,
-              })}
-              title={label}
-            >
-              <Icon className="nav-icon" size={18} />
-              {!isCollapsed && <span>{label}</span>}
-            </Link>
+            <div key={to} className="nav-item">
+              <Link
+                to={to}
+                className={clsx("nav-link", {
+                  "nav-link-active": isActive,
+                  "nav-link-active-parent": hasActiveChild,
+                  "nav-link-collapsed": isCollapsed,
+                })}
+                title={label}
+              >
+                <Icon className="nav-icon" size={18} />
+                {!isCollapsed && <span>{label}</span>}
+              </Link>
+
+              {showChildren ? (
+                <div className="nav-children">
+                  {children.map((child) => {
+                    const isChildActive =
+                      currentPath === child.to ||
+                      currentPath.startsWith(`${child.to}/`);
+
+                    return (
+                      <Link
+                        key={child.to}
+                        to={child.to}
+                        className={clsx("nav-sublink", {
+                          "nav-sublink-active": isChildActive,
+                        })}
+                        title={child.label}
+                      >
+                        {child.Icon && <child.Icon className="nav-icon" size={14} />}
+                        <span>{child.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
           );
         })}
       </nav>
@@ -147,6 +216,12 @@ Sidebar.flair = css`
     gap: 4px;
   }
 
+  .nav-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
   .nav-link {
     display: flex;
     align-items: center;
@@ -174,6 +249,16 @@ Sidebar.flair = css`
     color: white;
   }
 
+  .nav-link-active-parent {
+    background-color: transparent;
+    color: $colors.primary;
+  }
+
+  .nav-link-active-parent:hover {
+    background-color: color-mix(in srgb, $colors.primary, white 90%);
+    color: $colors.primary;
+  }
+
   .nav-link-active:hover {
     background-color: color-mix(in srgb, $colors.primary, black 20%);
     color: white;
@@ -181,6 +266,41 @@ Sidebar.flair = css`
 
   .nav-icon {
     flex-shrink: 0;
+  }
+
+  .nav-children {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-left: 12px;
+  }
+
+  .nav-sublink {
+    display: flex;
+    align-items: center;
+    min-height: 32px;
+    padding: 6px 12px;
+    border-radius: $radii.card;
+    color: $colors.text-muted;
+    text-decoration: none;
+    font-size: 0.82rem;
+    font-weight: 500;
+    gap: 8px;
+  }
+
+  .nav-sublink:hover {
+    background-color: $colors.surface-bright;
+    color: $colors.text;
+  }
+
+  .nav-sublink-active {
+    background-color: $colors.primary;
+    color: white;
+  }
+
+  .nav-sublink-active:hover {
+    background-color: color-mix(in srgb, $colors.primary, black 20%);
+    color: white;
   }
 `;
 
