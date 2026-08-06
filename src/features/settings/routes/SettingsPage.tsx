@@ -4,6 +4,7 @@ import Card from "@/components/Card";
 import Switch from "@/components/Switch";
 import {
   getAppSettings,
+  setBlockInternetOnly,
   setThemePreference,
   setTurnOffModesAndFiltersOnClose,
 } from "@/utils/api";
@@ -16,11 +17,13 @@ import type { ThemePreference } from "@/utils/types";
 
 function SettingsPage() {
   const [turnOffOnClose, setTurnOffOnClose] = useState(false);
+  const [blockInternetOnly, setBlockInternetOnlyState] = useState(true);
   const [themePreference, setThemePreferenceState] = useState<ThemePreference>(
     getStoredThemePreference(),
   );
   const [loading, setLoading] = useState(true);
   const [savingClose, setSavingClose] = useState(false);
+  const [savingInternetOnly, setSavingInternetOnly] = useState(false);
   const [savingTheme, setSavingTheme] = useState(false);
   const [error, setError] = useState("");
 
@@ -33,6 +36,7 @@ function SettingsPage() {
           return;
         }
         setTurnOffOnClose(settings.turn_off_modes_and_filters_on_close);
+        setBlockInternetOnlyState(settings.block_internet_only);
         setThemePreferenceState(settings.theme_preference);
         setStoredThemePreference(settings.theme_preference);
         applyThemePreference(settings.theme_preference);
@@ -82,6 +86,19 @@ function SettingsPage() {
     }
   }
 
+  async function onToggleBlockInternetOnly(next: boolean) {
+    setSavingInternetOnly(true);
+    setError("");
+    try {
+      const settings = await setBlockInternetOnly(next);
+      setBlockInternetOnlyState(settings.block_internet_only);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSavingInternetOnly(false);
+    }
+  }
+
   return (
     <div className="settings-page">
       <div className="settings-page-head">
@@ -106,9 +123,7 @@ function SettingsPage() {
               className="settings-select"
               value={themePreference}
               onChange={(event) => {
-                onThemePreferenceChange(
-                  event.target.value as ThemePreference,
-                );
+                onThemePreferenceChange(event.target.value as ThemePreference);
               }}
               disabled={loading || savingTheme}
               aria-label="Theme"
@@ -124,6 +139,21 @@ function SettingsPage() {
       <Card>
         <div className="settings-section">
           <p className="settings-section-title">General</p>
+          <div className="settings-row">
+            <div className="settings-row-copy">
+              <span>Only block internet-bound traffic</span>
+              <span className="settings-row-hint">
+                Loopback and LAN traffic stay allowed even when apps are blocked
+                by filters or modes.
+              </span>
+            </div>
+            <Switch
+              checked={blockInternetOnly}
+              onCheckedChange={onToggleBlockInternetOnly}
+              disabled={loading || savingInternetOnly}
+              ariaLabel="Only block internet-bound traffic"
+            />
+          </div>
           <div className="settings-row">
             <div className="settings-row-copy">
               <span>Turn off modes and filters when app is closed</span>

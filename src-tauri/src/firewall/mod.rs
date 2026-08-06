@@ -200,6 +200,39 @@ impl FirewallManager {
         }
     }
 
+    /// Enables or disables high-priority permit filters for local/non-internet
+    /// destinations so app and mode blocks only affect internet-bound traffic.
+    pub fn set_local_traffic_allow(&self, enabled: bool) -> Result<()> {
+        #[cfg(not(windows))]
+        {
+            let _ = enabled;
+            return Err(FirewallError::UnsupportedPlatform);
+        }
+
+        #[cfg(windows)]
+        {
+            let tx = self.engine.transaction()?;
+            if enabled {
+                provider::ensure_provider_and_sublayer(&self.engine)?;
+                filters::delete_tagged_local_permit_filters(
+                    &self.engine,
+                    MODE_TAG_LOCAL_TRAFFIC_ALLOW,
+                )?;
+                filters::add_tagged_local_permit_filters(
+                    &self.engine,
+                    MODE_TAG_LOCAL_TRAFFIC_ALLOW,
+                    WEIGHT_LOCAL_TRAFFIC_ALLOW,
+                )?;
+            } else {
+                filters::delete_tagged_local_permit_filters(
+                    &self.engine,
+                    MODE_TAG_LOCAL_TRAFFIC_ALLOW,
+                )?;
+            }
+            tx.commit()
+        }
+    }
+
     /// Adds or removes a permit-exception filter for one executable, used by
     /// "block all except" modes to carve out allowed apps above the default deny.
     pub fn set_mode_permit<P: AsRef<Path>>(&self, exe: P, enabled: bool) -> Result<()> {
@@ -278,11 +311,15 @@ const MODE_TAG_PERMIT: &str = "mode-permit";
 #[cfg(windows)]
 const MODE_TAG_BLOCK: &str = "mode-block";
 #[cfg(windows)]
+const MODE_TAG_LOCAL_TRAFFIC_ALLOW: &str = "local-traffic-allow";
+#[cfg(windows)]
 const WEIGHT_DEFAULT_DENY: u8 = 0x01;
 #[cfg(windows)]
 const WEIGHT_MODE_PERMIT: u8 = 0x08;
 #[cfg(windows)]
 const WEIGHT_MODE_BLOCK: u8 = 0x0f;
+#[cfg(windows)]
+const WEIGHT_LOCAL_TRAFFIC_ALLOW: u8 = 0x10;
 
 #[cfg(windows)]
 fn normalize_exe_path<P: AsRef<Path>>(exe: P) -> Result<PathBuf> {
