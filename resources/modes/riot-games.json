@@ -1,0 +1,36 @@
+{
+  "schema": "kaaval.modes.v1",
+  "exported_at": "2026-08-04T15:37:33.537Z",
+  "app": "kaaval",
+  "modes": [
+    {
+      "id": "93d47ebb-5ab2-4787-afad-01a7c111a50e",
+      "name": "Riot Games",
+      "description": "Allow Riot/Valorant traffic and core Windows services only. Not affiliated with Riot Games, Inc. or any of its subsidiaries.",
+      "icon_data_url": null,
+      "mode_type": "block_all_except",
+      "matchers": [
+        {
+          "kind": "directory",
+          "value": "C:\\Riot Games\\"
+        },
+        {
+          "kind": "path",
+          "value": "C:\\Windows\\System32\\svchost.exe"
+        },
+        {
+          "kind": "directory",
+          "value": "C:\\Program Files\\Riot Vanguard"
+        },
+        {
+          "kind": "path",
+          "value": "C:\\Windows\\System32\\lsass.exe"
+        },
+        {
+          "kind": "directory",
+          "value": "C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application"
+        }
+      ]
+    }
+  ]
+}
