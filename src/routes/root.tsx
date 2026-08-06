@@ -4,6 +4,7 @@ import { css } from "@flairjs/client";
 import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
 import { relaunchAsAdmin } from "@/utils/api";
+import { checkForUpdatesSilently } from "@/utils/updater";
 import { useNetworkStore } from "@/store/networkStore";
 
 function RootLayout() {
@@ -37,6 +38,12 @@ function RootLayout() {
       console.error("failed to relaunch as administrator", e);
     });
   }, [isAdmin, loading]);
+
+  useEffect(() => {
+    checkForUpdatesSilently().catch((error) => {
+      console.error("silent update check failed", error);
+    });
+  }, []);
 
   return (
     <div className="app-shell">
