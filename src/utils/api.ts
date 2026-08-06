@@ -89,6 +89,12 @@ export function setTurnOffModesAndFiltersOnClose(
   });
 }
 
+export function setBlockInternetOnly(enabled: boolean): Promise<AppSettings> {
+  return invoke<AppSettings>("set_block_internet_only", {
+    enabled,
+  });
+}
+
 export function setThemePreference(
   themePreference: ThemePreference,
 ): Promise<AppSettings> {

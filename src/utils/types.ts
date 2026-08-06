@@ -57,6 +57,7 @@ export type KnownApp = {
 
 export type AppSettings = {
   turn_off_modes_and_filters_on_close: boolean;
+  block_internet_only: boolean;
   theme_preference: ThemePreference;
 };
 
