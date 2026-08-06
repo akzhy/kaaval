@@ -123,9 +123,7 @@ function SettingsPage() {
               className="settings-select"
               value={themePreference}
               onChange={(event) => {
-                onThemePreferenceChange(
-                  event.target.value as ThemePreference,
-                );
+                onThemePreferenceChange(event.target.value as ThemePreference);
               }}
               disabled={loading || savingTheme}
               aria-label="Theme"
@@ -145,8 +143,8 @@ function SettingsPage() {
             <div className="settings-row-copy">
               <span>Only block internet-bound traffic</span>
               <span className="settings-row-hint">
-                Local and private network traffic stays allowed even when apps
-                are blocked by filters or modes.
+                Loopback and LAN traffic stay allowed even when apps are blocked
+                by filters or modes.
               </span>
             </div>
             <Switch
