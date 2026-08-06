@@ -636,15 +636,41 @@ fn set_block_internet_only(
         return Err(admin_required_error("changing internet-only blocking"));
     }
 
-    with_manager(&state, |manager| manager.set_local_traffic_allow(enabled))?;
+    let (previous, updated) = {
+        let mut app_settings = settings_state
+            .inner()
+            .lock()
+            .map_err(|_| "failed to lock settings state".to_string())?;
+        let previous = app_settings.settings.block_internet_only;
+        app_settings.settings.block_internet_only = enabled;
+        app_settings.save()?;
+        (previous, app_settings.settings.clone())
+    };
 
-    let mut app_settings = settings_state
-        .inner()
-        .lock()
-        .map_err(|_| "failed to lock settings state".to_string())?;
-    app_settings.settings.block_internet_only = enabled;
-    app_settings.save()?;
-    Ok(app_settings.settings.clone())
+    if let Err(err) = with_manager(&state, |manager| manager.set_local_traffic_allow(enabled)) {
+        let rollback_err = {
+            let mut app_settings = settings_state
+                .inner()
+                .lock()
+                .map_err(|_| "failed to lock settings state during rollback".to_string())?;
+            app_settings.settings.block_internet_only = previous;
+            app_settings.save().err()
+        };
+
+        if let Some(rollback_err) = rollback_err {
+            warn!(
+                error = %rollback_err,
+                "failed to roll back block_internet_only setting after firewall apply failure"
+            );
+            return Err(format!(
+                "failed to apply firewall setting: {err}; also failed to roll back persisted setting: {rollback_err}"
+            ));
+        }
+
+        return Err(err);
+    }
+
+    Ok(updated)
 }
 
 #[tauri::command]
