@@ -2,6 +2,7 @@ import Card from "@/components/Card";
 import ModesPreview from "@/features/dashboard/components/ModesPreview";
 import RecentActivityTable from "@/features/dashboard/components/RecentActivityTable";
 import ThroughputChart from "@/features/dashboard/components/ThroughputChart";
+import { useNetworkPolling } from "@/features/network/useNetworkPolling";
 import { relaunchAsAdmin } from "@/utils/api";
 import { useNetworkStore } from "@/store/networkStore";
 import { buildApplicationGroups } from "@/utils/groupRequests";
@@ -16,6 +17,8 @@ function DashboardPage() {
   const throughputHistory = useNetworkStore((state) => state.throughputHistory);
   const error = useNetworkStore((state) => state.error);
   const isAdmin = useNetworkStore((state) => state.isAdmin);
+
+  useNetworkPolling();
 
   async function onRelaunchAsAdmin() {
     setRelaunching(true);

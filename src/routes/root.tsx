@@ -6,8 +6,6 @@ import TopBar from "@/components/TopBar";
 import { relaunchAsAdmin } from "@/utils/api";
 import { useNetworkStore } from "@/store/networkStore";
 
-const POLL_INTERVAL_MS = 2000;
-
 function RootLayout() {
   const refresh = useNetworkStore((state) => state.refresh);
   const error = useNetworkStore((state) => state.error);
@@ -20,10 +18,6 @@ function RootLayout() {
 
   useEffect(() => {
     refresh();
-    const timer = window.setInterval(() => {
-      refresh();
-    }, POLL_INTERVAL_MS);
-    return () => window.clearInterval(timer);
   }, [refresh]);
 
   useEffect(() => {

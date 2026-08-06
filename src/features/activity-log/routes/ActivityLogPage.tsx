@@ -5,6 +5,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import Card from "@/components/Card";
 import DataTable from "@/components/DataTable";
 import StatusBadge from "@/components/StatusBadge";
+import { useNetworkPolling } from "@/features/network/useNetworkPolling";
 import { useNetworkStore } from "@/store/networkStore";
 import { buildApplicationGroups } from "@/utils/groupRequests";
 import type { ApplicationGroup } from "@/utils/types";
@@ -20,6 +21,8 @@ function ActivityLogPage() {
   const startRecording = useNetworkStore((state) => state.startRecording);
   const stopRecording = useNetworkStore((state) => state.stopRecording);
   const [search, setSearch] = useState("");
+
+  useNetworkPolling();
 
   function suggestedRecordingName(startedAtMs: number | null) {
     const date = new Date(startedAtMs ?? Date.now());
