@@ -1,0 +1,65 @@
+name: Release App
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_body:
+        description: Release notes/body shown in the GitHub release draft.
+        required: false
+        default: "See attached updater artifacts and installer binaries."
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify Tauri version matches package.json
+        shell: pwsh
+        run: |
+          $packageVersion = node -p "require('./package.json').version"
+          $tauriConfigPath = "src-tauri/tauri.conf.json"
+          $config = Get-Content $tauriConfigPath -Raw | ConvertFrom-Json
+          $tauriVersion = $config.version
+          if ($packageVersion -ne $tauriVersion) {
+            Write-Host "ERROR: Version mismatch! package.json: v$packageVersion, tauri.conf.json: v$tauriVersion"
+            exit 1
+          }
+          Write-Host "Version check passed: v$packageVersion"
+
+      - name: Build and create draft release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: v__VERSION__
+          releaseName: Kaaval v__VERSION__
+          releaseBody: ${{ github.event.inputs.release_body }}
+          releaseDraft: true
+          prerelease: false
+          args: --target x86_64-pc-windows-msvc
