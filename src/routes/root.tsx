@@ -1,8 +1,9 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Outlet } from "@tanstack/react-router";
 import { css } from "@flairjs/client";
 import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
+import logo from "@/assets/logo_64x64.png";
 import { relaunchAsAdmin } from "@/utils/api";
 import { checkForUpdatesSilently } from "@/utils/updater";
 import { useNetworkStore } from "@/store/networkStore";
@@ -15,6 +16,7 @@ function RootLayout() {
   );
   const isAdmin = useNetworkStore((state) => state.isAdmin);
   const loading = useNetworkStore((state) => state.loading);
+  const [minimumSplashElapsed, setMinimumSplashElapsed] = useState(false);
   const startupPromptedRef = useRef(false);
 
   useEffect(() => {
@@ -44,6 +46,24 @@ function RootLayout() {
       console.error("silent update check failed", error);
     });
   }, []);
+
+  useEffect(() => {
+    const minimumSplashTimer = window.setTimeout(() => {
+      setMinimumSplashElapsed(true);
+    }, 500);
+
+    return () => {
+      window.clearTimeout(minimumSplashTimer);
+    };
+  }, []);
+
+  if (loading || !minimumSplashElapsed) {
+    return (
+      <div className="app-splash" role="status" aria-label="Loading Kaaval">
+        <img src={logo} alt="Kaaval logo" className="app-splash-logo" />
+      </div>
+    );
+  }
 
   return (
     <div className="app-shell">
@@ -80,9 +100,31 @@ RootLayout.globalFlair = css`
     font-family: $fonts.family;
     -webkit-font-smoothing: antialiased;
   }
+
+  body[data-theme="dark"] .app-splash {
+    background: #000000;
+  }
+
+  body[data-theme="light"] .app-splash {
+    background: #ffffff;
+  }
 `;
 
 RootLayout.flair = css`
+  .app-splash {
+    height: 100vh;
+    width: 100%;
+    display: grid;
+    place-items: center;
+  }
+
+  .app-splash-logo {
+    width: 96px;
+    height: 96px;
+    object-fit: contain;
+    image-rendering: -webkit-optimize-contrast;
+  }
+
   .app-shell {
     display: flex;
     height: 100vh;
