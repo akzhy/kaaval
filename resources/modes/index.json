@@ -1,9 +1,0 @@
-{
-  "modes": [
-    {
-      "title": "Riot Games",
-      "description": "Allow Riot/Valorant traffic and core Windows services only. Not affiliated with Riot Games, Inc. or any of its subsidiaries.",
-      "path": "riot-games.json"
-    }
-  ]
-}
