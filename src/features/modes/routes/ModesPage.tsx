@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
-import { useNavigate, useSearch } from "@tanstack/react-router";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { css } from "@flairjs/client";
 import { open } from "@tauri-apps/plugin-dialog";
 import Card from "@/components/Card";
@@ -296,6 +296,9 @@ function ModesPage() {
           </p>
         </div>
         <div className="modes-page-head-actions">
+          <Link to="/modes/community" className="modes-page-head-link">
+            Community Modes
+          </Link>
           <button
             type="button"
             className="modes-page-head-btn"
@@ -520,6 +523,25 @@ ModesPage.flair = css`
     font-weight: 600;
     cursor: pointer;
     white-space: nowrap;
+  }
+
+  .modes-page-head-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: $colors.surface;
+    border: 1px solid $colors.border;
+    border-radius: $radii.card;
+    padding: 8px 12px;
+    color: $colors.text;
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .modes-page-head-link:hover {
+    background-color: $colors.surface-bright;
   }
 
   .modes-page-head-btn:disabled {

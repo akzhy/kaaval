@@ -9,6 +9,7 @@ import ActivityLogPage from "@/features/activity-log/routes/ActivityLogPage";
 import RecordingsPage from "@/features/activity-log/routes/RecordingsPage";
 import RecordingDetailPage from "@/features/activity-log/routes/RecordingDetailPage";
 import ModesPage from "@/features/modes/routes/ModesPage";
+import CommunityModesPage from "../features/modes/routes/CommunityModesPage";
 import SettingsPage from "@/features/settings/routes/SettingsPage";
 
 const rootRoute = createRootRoute({ component: RootLayout });
@@ -23,6 +24,12 @@ const modesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/modes",
   component: ModesPage,
+});
+
+const communityModesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/modes/community",
+  component: CommunityModesPage,
 });
 
 const activityLogRoute = createRoute({
@@ -52,6 +59,7 @@ const settingsRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   dashboardRoute,
   modesRoute,
+  communityModesRoute,
   activityLogRoute,
   recordingsRoute,
   recordingDetailRoute,
